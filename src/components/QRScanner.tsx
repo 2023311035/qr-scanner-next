@@ -56,13 +56,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         
         if (videoDevices.length === 0) {
           setCameraError('カメラが見つかりません。デバイスにカメラが接続されているか確認してください。');
-          setIsInitializing(false);
           return;
         }
 
         // デフォルトで最初のカメラを選択
         setSelectedCamera(videoDevices[0].deviceId);
-        setIsInitializing(false);
         return;
       } catch (error) {
         console.error('予期せぬエラー:', error);
@@ -112,7 +110,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             }
           });
         }
-        setIsInitializing(false);
       } catch (error) {
         console.error('カメラの初期化エラー:', error);
         if (error instanceof Error) {
@@ -126,6 +123,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             setCameraError(`カメラの初期化に失敗しました: ${error.message}`);
           }
         }
+      } finally {
         setIsInitializing(false);
       }
     };
