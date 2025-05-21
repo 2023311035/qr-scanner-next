@@ -62,7 +62,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
         // デフォルトで最初のカメラを選択
         setSelectedCamera(videoDevices[0].deviceId);
-
+        setIsInitializing(false);
+        return;
       } catch (error) {
         console.error('予期せぬエラー:', error);
         setCameraError('予期せぬエラーが発生しました。ページを再読み込みして、もう一度お試しください。');
@@ -82,6 +83,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   }, []);
 
   useEffect(() => {
+    console.log('availableCameras:', availableCameras);
+    console.log('selectedCamera:', selectedCamera);
     if (!selectedCamera) return;
     const startCamera = async () => {
       setIsInitializing(true);
