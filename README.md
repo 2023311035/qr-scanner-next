@@ -1,4 +1,24 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# QR Scanner Next.js App
+
+This is a QR code scanner web application built with Next.js.
+
+## Features
+
+- QR code scanning using device camera
+- Support for multiple cameras
+- Real-time scanning
+- Scan history
+- Automatic deployment with Vercel
+
+## Development
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Run development server: `npm run dev`
+
+## Deployment
+
+This project is automatically deployed to Vercel. Any changes pushed to the main branch will trigger a new deployment.
 
 ## Getting Started
 
