@@ -55,6 +55,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           setSelectedCamera(videoDevices[0].deviceId);
         }
       } catch (e) {
+        console.error(e);
         setCameraError('カメラデバイスの取得に失敗しました。');
       }
       setIsInitializing(false);
@@ -83,6 +84,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           await videoRef.current.play();
         }
       } catch (e) {
+        console.error(e);
         setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
       }
       setIsInitializing(false);
