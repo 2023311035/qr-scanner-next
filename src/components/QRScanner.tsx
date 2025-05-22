@@ -214,7 +214,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           <div className="relative rounded-lg overflow-hidden shadow-md bg-gray-800">
             <video
               ref={videoRef}
-              className="w-full"
+              className="w-full h-64 object-cover"
               playsInline
               muted
             />
