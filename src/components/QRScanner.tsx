@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
+import { BrowserBarcodeReader, NotFoundException } from '@zxing/library';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -15,6 +16,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const barcodeReaderRef = useRef<BrowserBarcodeReader | null>(null);
 
   const isValidUrl = (string: string) => {
     try {
@@ -65,8 +67,15 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   }, []);
 
   useEffect(() => {
+    barcodeReaderRef.current = new BrowserBarcodeReader();
+    return () => {
+      barcodeReaderRef.current?.reset();
+    };
+  }, []);
+
+  useEffect(() => {
     let animationFrameId: number;
-    const scanQRCode = () => {
+    const scanCodes = async () => {
       if (videoRef.current && canvasRef.current) {
         const video = videoRef.current;
         const canvas = canvasRef.current;
@@ -76,20 +85,36 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           canvas.height = video.videoHeight;
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-          if (code) {
-            if (!scannedCodes.has(code.data)) {
-              setScannedCodes(prev => new Set([...prev, code.data]));
-              setLastScannedCode(code.data);
-              onScanSuccess(code.data);
+          // まずjsQRでQRコードを試す
+          const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+          if (qrCode) {
+            if (!scannedCodes.has(qrCode.data)) {
+              setScannedCodes(prev => new Set([...prev, qrCode.data]));
+              setLastScannedCode(qrCode.data);
+              onScanSuccess(qrCode.data);
+            }
+          } else if (barcodeReaderRef.current) {
+            // QRコードがなければ1次元バーコードを試す
+            try {
+              const imageUrl = canvas.toDataURL();
+              const result = await barcodeReaderRef.current.decodeFromImage(undefined, imageUrl);
+              if (result && !scannedCodes.has(result.getText())) {
+                setScannedCodes(prev => new Set([...prev, result.getText()]));
+                setLastScannedCode(result.getText());
+                onScanSuccess(result.getText());
+              }
+            } catch (e) {
+              if (!(e instanceof NotFoundException)) {
+                // 何か他のエラーがあれば無視
+              }
             }
           }
         }
       }
-      animationFrameId = requestAnimationFrame(scanQRCode);
+      animationFrameId = requestAnimationFrame(scanCodes);
     };
     if (!isInitializing && !cameraError) {
-      scanQRCode();
+      scanCodes();
     }
     return () => {
       if (animationFrameId) {
