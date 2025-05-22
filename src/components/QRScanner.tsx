@@ -203,7 +203,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
         <div className="bg-gray-800 p-4 rounded-lg shadow-sm">
           <h3 className="text-lg font-semibold mb-3 text-white">スキャン履歴:</h3>
-          <ul className="space-y-2">
+          <ul className="space-y-2 max-h-[440px] overflow-y-auto pr-2">
             {Array.from(scannedCodes).map((code, index) => (
               <li key={index} className="p-3 bg-gray-700 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200">
                 {isValidUrl(code) ? (
