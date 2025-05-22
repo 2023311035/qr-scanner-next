@@ -33,106 +33,64 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   };
 
   useEffect(() => {
-    const initializeCamera = async () => {
+    // 初回マウント時にカメラ一覧を取得
+    const getCameras = async () => {
+      setIsInitializing(true);
+      setCameraError('');
       try {
-        setIsInitializing(true);
-        setCameraError('');
-
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
+          setIsInitializing(false);
           return;
         }
-
-        // カメラデバイスの一覧を取得
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices
-          .filter(device => device.kind === 'videoinput')
-          .map(device => ({
-            deviceId: device.deviceId,
-            label: device.label || `カメラ ${device.deviceId.slice(0, 5)}`
-          }));
-        
+        const videoDevices = devices.filter(d => d.kind === 'videoinput').map(device => ({
+          deviceId: device.deviceId,
+          label: device.label || `カメラ ${device.deviceId.slice(0, 5)}`
+        }));
         setAvailableCameras(videoDevices);
-        
         if (videoDevices.length === 0) {
           setCameraError('カメラが見つかりません。デバイスにカメラが接続されているか確認してください。');
-          return;
+        } else {
+          setSelectedCamera(videoDevices[0].deviceId);
         }
-
-        // デフォルトで最初のカメラを選択
-        setSelectedCamera(videoDevices[0].deviceId);
-        return;
-      } catch (error) {
-        console.error('予期せぬエラー:', error);
-        setCameraError('予期せぬエラーが発生しました。ページを再読み込みして、もう一度お試しください。');
-        setIsInitializing(false);
+      } catch (e) {
+        setCameraError('カメラデバイスの取得に失敗しました。');
       }
+      setIsInitializing(false);
     };
-
-    initializeCamera();
-
+    getCameras();
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop();
-        });
+        streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
 
   useEffect(() => {
-    console.log('availableCameras:', availableCameras);
-    console.log('selectedCamera:', selectedCamera);
+    // selectedCameraがセットされたらカメラを起動
     if (!selectedCamera) return;
     const startCamera = async () => {
       setIsInitializing(true);
       setCameraError('');
-      const constraints = {
-        video: {
-          deviceId: { exact: selectedCamera },
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      };
       try {
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: selectedCamera }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        });
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           streamRef.current = stream;
-          await new Promise((resolve) => {
-            if (videoRef.current) {
-              videoRef.current.onloadedmetadata = () => {
-                videoRef.current?.play().then(resolve).catch((error) => {
-                  console.error('ビデオの再生に失敗:', error);
-                  setCameraError('カメラの再生に失敗しました。');
-                });
-              };
-            }
-          });
+          await videoRef.current.play();
         }
-      } catch (error) {
-        console.error('カメラの初期化エラー:', error);
-        if (error instanceof Error) {
-          if (error.name === 'NotAllowedError') {
-            setCameraError('カメラへのアクセスが拒否されました。ブラウザの設定でカメラの使用を許可してください。');
-          } else if (error.name === 'NotFoundError') {
-            setCameraError('カメラが見つかりません。デバイスにカメラが接続されているか確認してください。');
-          } else if (error.name === 'AbortError') {
-            setCameraError('カメラの初期化が中断されました。ページを再読み込みして、もう一度お試しください。');
-          } else {
-            setCameraError(`カメラの初期化に失敗しました: ${error.message}`);
-          }
-        }
-      } finally {
-        setIsInitializing(false);
+      } catch (e) {
+        setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
       }
+      setIsInitializing(false);
     };
     startCamera();
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => {
-          track.stop();
-        });
+        streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
   }, [selectedCamera]);
