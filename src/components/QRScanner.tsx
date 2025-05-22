@@ -51,7 +51,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           await videoRef.current.play();
         }
         setIsInitializing(false);
-      } catch (error) {
+      } catch {
         setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
         setIsInitializing(false);
       }
