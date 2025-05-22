@@ -89,7 +89,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
           if (qrCode) {
             if (!scannedCodes.has(qrCode.data)) {
-              setScannedCodes(prev => new Set([...prev, qrCode.data]));
+              setScannedCodes(prev => {
+                const arr = Array.from(prev);
+                arr.push(qrCode.data);
+                return new Set(arr.slice(-10));
+              });
               setLastScannedCode(qrCode.data);
               onScanSuccess(qrCode.data);
             }
@@ -99,7 +103,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               const imageUrl = canvas.toDataURL();
               const result = await barcodeReaderRef.current.decodeFromImage(undefined, imageUrl);
               if (result && !scannedCodes.has(result.getText())) {
-                setScannedCodes(prev => new Set([...prev, result.getText()]));
+                setScannedCodes(prev => {
+                  const arr = Array.from(prev);
+                  arr.push(result.getText());
+                  return new Set(arr.slice(-10));
+                });
                 setLastScannedCode(result.getText());
                 onScanSuccess(result.getText());
               }
