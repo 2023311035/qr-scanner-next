@@ -82,14 +82,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   }, []);
 
   useEffect(() => {
-    if (!selectedCamera) return;
     const startCamera = async () => {
       setIsInitializing(true);
       setCameraError('');
       try {
         const constraints = {
           video: {
-            deviceId: { exact: selectedCamera },
+            facingMode: { ideal: 'environment' },
             width: { ideal: 1280 },
             height: { ideal: 720 }
           }
@@ -112,7 +111,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         streamRef.current.getTracks().forEach(track => track.stop());
       }
     };
-  }, [selectedCamera]);
+  }, []);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -158,25 +157,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     <div className="w-full max-w-2xl mx-auto p-6 bg-gray-900 rounded-xl shadow-lg">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-white mb-4">QRコードスキャナー</h2>
-        {availableCameras.length > 1 && (
-          <div className="mb-4">
-            <label htmlFor="camera-select" className="block text-sm font-medium text-gray-300 mb-2">
-              カメラを選択
-            </label>
-            <select
-              id="camera-select"
-              value={selectedCamera}
-              onChange={(e) => setSelectedCamera(e.target.value)}
-              className="w-full p-2 border border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-800 text-white"
-            >
-              {availableCameras.map((camera) => (
-                <option key={camera.deviceId} value={camera.deviceId}>
-                  {camera.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* カメラ選択UIは一旦非表示 */}
       </div>
 
       {isInitializing && (
