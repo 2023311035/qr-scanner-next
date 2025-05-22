@@ -17,8 +17,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCode, setLastScannedCode] = useState<string>('');
-  const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
-  const [selectedCamera, setSelectedCamera] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -53,8 +51,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             label: device.label || `カメラ ${device.deviceId.slice(0, 5)}`
           }));
 
-        setAvailableCameras(videoDevices);
-
         if (videoDevices.length === 0) {
           setCameraError('カメラが見つかりません。デバイスにカメラが接続されているか確認してください。');
           setIsInitializing(false);
@@ -62,7 +58,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         }
 
         // デフォルトで最初のカメラを選択
-        setSelectedCamera(videoDevices[0].deviceId);
         setIsInitializing(false);
         return;
       } catch (error) {
