@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import jsQR from 'jsqr';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -13,8 +13,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCode, setLastScannedCode] = useState<string>('');
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
 
   const isValidUrl = (string: string) => {
     try {
@@ -26,122 +25,41 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   };
 
   useEffect(() => {
-    const initializeCamera = async () => {
-      try {
-        setIsInitializing(true);
-        setCameraError('');
+    setIsInitializing(true);
+    setCameraError('');
+    const codeReader = new BrowserMultiFormatReader();
+    codeReaderRef.current = codeReader;
 
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
-          setIsInitializing(false);
-          return;
-        }
+    let controls: any = undefined;
 
-        // カメラデバイスの一覧を取得
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices
-          .filter(device => device.kind === 'videoinput')
-          .map(device => ({
-            deviceId: device.deviceId,
-            label: device.label || `カメラ ${device.deviceId.slice(0, 5)}`
-          }));
-
-        if (videoDevices.length === 0) {
-          setCameraError('カメラが見つかりません。デバイスにカメラが接続されているか確認してください。');
-          setIsInitializing(false);
-          return;
-        }
-
-        // デフォルトで最初のカメラを選択
-        setIsInitializing(false);
-        return;
-      } catch (error) {
-        console.error(error);
-        setCameraError('カメラの初期化に失敗しました');
-        setIsInitializing(false);
-      }
-    };
-
-    initializeCamera();
-
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    const startCamera = async () => {
-      setIsInitializing(true);
-      setCameraError('');
-      try {
-        const constraints = {
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+    codeReader.decodeFromVideoDevice(
+      undefined,
+      videoRef.current!,
+      (result, err) => {
+        if (result) {
+          if (!scannedCodes.has(result.getText())) {
+            setScannedCodes(prev => new Set([...prev, result.getText()]));
+            setLastScannedCode(result.getText());
+            onScanSuccess(result.getText());
           }
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          streamRef.current = stream;
-          await videoRef.current.play();
         }
-      } catch (error) {
-        console.error(error);
-        setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
+        if (err && !(err.name === 'NotFoundException')) {
+          setCameraError('カメラの起動または読み取りに失敗しました。');
+        }
       }
+    ).then((ctrl) => {
+      controls = ctrl;
       setIsInitializing(false);
-    };
-    startCamera();
+    }).catch((e) => {
+      setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
+      setIsInitializing(false);
+    });
+
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
+      if (controls && typeof controls.stop === 'function') controls.stop();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  useEffect(() => {
-    let animationFrameId: number;
-
-    const scanQRCode = () => {
-      if (videoRef.current && canvasRef.current) {
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
-
-        if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          context.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          const code = jsQR(imageData.data, imageData.width, imageData.height);
-
-          if (code) {
-            console.log('QRコードを検出:', code.data);
-            if (!scannedCodes.has(code.data)) {
-              setScannedCodes(prev => new Set([...prev, code.data]));
-              setLastScannedCode(code.data);
-              onScanSuccess(code.data);
-            }
-          }
-        }
-      }
-      animationFrameId = requestAnimationFrame(scanQRCode);
-    };
-
-    if (!isInitializing && !cameraError) {
-      scanQRCode();
-    }
-
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [isInitializing, cameraError, scannedCodes, onScanSuccess]);
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6 bg-gray-900 rounded-xl shadow-lg">
@@ -174,10 +92,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             className="w-full"
             playsInline
             muted
-          />
-          <canvas
-            ref={canvasRef}
-            className="hidden"
           />
         </div>
       )}
