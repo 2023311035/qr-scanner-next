@@ -7,11 +7,6 @@ interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
 }
 
-interface CameraDevice {
-  deviceId: string;
-  label: string;
-}
-
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
   const [cameraError, setCameraError] = useState<string>('');
