@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BrowserMultiFormatReader, IScannerControls } from '@zxing/browser';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -30,7 +30,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     const codeReader = new BrowserMultiFormatReader();
     codeReaderRef.current = codeReader;
 
-    let controls: any = undefined;
+    let controls: IScannerControls | undefined = undefined;
 
     codeReader.decodeFromVideoDevice(
       undefined,
@@ -51,6 +51,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       controls = ctrl;
       setIsInitializing(false);
     }).catch((e) => {
+      console.error(e);
       setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
       setIsInitializing(false);
     });
