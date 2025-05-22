@@ -18,6 +18,63 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const barcodeReaderRef = useRef<BrowserBarcodeReader | null>(null);
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        if (canvasRef.current) {
+          const canvas = canvasRef.current;
+          const context = canvas.getContext('2d');
+          if (context) {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            context.drawImage(img, 0, 0);
+            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // QRコードのスキャン
+            const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+            if (qrCode) {
+              if (!scannedCodes.has(qrCode.data)) {
+                setScannedCodes(prev => {
+                  const arr = Array.from(prev);
+                  arr.push(qrCode.data);
+                  return new Set(arr.slice(-10));
+                });
+                setLastScannedCode(qrCode.data);
+                onScanSuccess(qrCode.data);
+              }
+            } else if (barcodeReaderRef.current) {
+              // バーコードのスキャン
+              try {
+                const imageUrl = canvas.toDataURL();
+                const result = await barcodeReaderRef.current.decodeFromImage(undefined, imageUrl);
+                if (result && !scannedCodes.has(result.getText())) {
+                  setScannedCodes(prev => {
+                    const arr = Array.from(prev);
+                    arr.push(result.getText());
+                    return new Set(arr.slice(-10));
+                  });
+                  setLastScannedCode(result.getText());
+                  onScanSuccess(result.getText());
+                }
+              } catch (e) {
+                if (!(e instanceof NotFoundException)) {
+                  console.error('バーコードの読み取りに失敗しました');
+                }
+              }
+            }
+          }
+        }
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
   const isValidUrl = (string: string) => {
     try {
       new URL(string);
@@ -153,18 +210,31 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           {cameraError}
         </div>
       ) : (
-        <div className="relative rounded-lg overflow-hidden shadow-md bg-gray-800">
-          <video
-            ref={videoRef}
-            className="w-full"
-            playsInline
-            muted
-          />
-          <canvas
-            ref={canvasRef}
-            className="hidden"
-          />
-        </div>
+        <>
+          <div className="relative rounded-lg overflow-hidden shadow-md bg-gray-800">
+            <video
+              ref={videoRef}
+              className="w-full"
+              playsInline
+              muted
+            />
+            <canvas
+              ref={canvasRef}
+              className="hidden"
+            />
+          </div>
+          <div className="mt-4">
+            <label className="block w-full p-4 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
+              <span className="text-white">画像ファイルから読み取る</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+          </div>
+        </>
       )}
       <div className="mt-6 space-y-6">
         {lastScannedCode && (
