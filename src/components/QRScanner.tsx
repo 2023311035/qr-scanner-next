@@ -8,7 +8,7 @@ interface QRScannerProps {
 }
 
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
-  const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
+  const [scannedCodes, setScannedCodes] = useState<string[]>([]);
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCode, setLastScannedCode] = useState<string>('');
@@ -78,8 +78,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
           const code = jsQR(imageData.data, imageData.width, imageData.height);
           if (code) {
-            if (!scannedCodes.has(code.data)) {
-              setScannedCodes(prev => new Set([...prev, code.data]));
+            if (!scannedCodes.includes(code.data)) {
+              setScannedCodes(prev => [...prev, code.data]);
               setLastScannedCode(code.data);
               onScanSuccess(code.data);
             }
@@ -97,6 +97,14 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       }
     };
   }, [isInitializing, cameraError, scannedCodes, onScanSuccess]);
+
+  const handleDelete = (index: number) => {
+    setScannedCodes(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleClearAll = () => {
+    setScannedCodes([]);
+  };
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6 bg-gray-900 rounded-xl shadow-lg">
@@ -155,27 +163,36 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-lg font-semibold text-white">スキャン履歴:</h3>
             <button
-              onClick={() => setScannedCodes(new Set())}
+              onClick={handleClearAll}
               className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
             >
-              履歴をクリア
+              すべて削除
             </button>
           </div>
           <ul className="space-y-2 max-h-[440px] overflow-y-auto pr-2">
-            {Array.from(scannedCodes).map((code, index) => (
-              <li key={index} className="p-3 bg-gray-700 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200">
-                {isValidUrl(code) ? (
-                  <a 
-                    href={code} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 break-all hover:underline"
-                  >
-                    {code}
-                  </a>
-                ) : (
-                  <p className="break-all text-gray-300">{code}</p>
-                )}
+            {scannedCodes.map((code, index) => (
+              <li key={index} className="p-3 bg-gray-700 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200 flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  {isValidUrl(code) ? (
+                    <a 
+                      href={code} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 break-all hover:underline"
+                    >
+                      {code}
+                    </a>
+                  ) : (
+                    <p className="break-all text-gray-300">{code}</p>
+                  )}
+                </div>
+                <button
+                  onClick={() => handleDelete(index)}
+                  className="ml-3 text-red-400 hover:text-red-600 px-2 py-1 rounded transition-colors"
+                  aria-label="この履歴を削除"
+                >
+                  🗑
+                </button>
               </li>
             ))}
           </ul>
