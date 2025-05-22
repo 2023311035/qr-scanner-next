@@ -33,34 +33,47 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   };
 
   useEffect(() => {
-    // 初回マウント時にカメラ一覧を取得
-    const getCameras = async () => {
-      setIsInitializing(true);
-      setCameraError('');
+    const initializeCamera = async () => {
       try {
+        setIsInitializing(true);
+        setCameraError('');
+
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
           setIsInitializing(false);
           return;
         }
+
+        // カメラデバイスの一覧を取得
         const devices = await navigator.mediaDevices.enumerateDevices();
-        const videoDevices = devices.filter(d => d.kind === 'videoinput').map(device => ({
-          deviceId: device.deviceId,
-          label: device.label || `カメラ ${device.deviceId.slice(0, 5)}`
-        }));
+        const videoDevices = devices
+          .filter(device => device.kind === 'videoinput')
+          .map(device => ({
+            deviceId: device.deviceId,
+            label: device.label || `カメラ ${device.deviceId.slice(0, 5)}`
+          }));
+
         setAvailableCameras(videoDevices);
+
         if (videoDevices.length === 0) {
           setCameraError('カメラが見つかりません。デバイスにカメラが接続されているか確認してください。');
-        } else {
-          setSelectedCamera(videoDevices[0].deviceId);
+          setIsInitializing(false);
+          return;
         }
-      } catch (e) {
-        console.error(e);
-        setCameraError('カメラデバイスの取得に失敗しました。');
+
+        // デフォルトで最初のカメラを選択
+        setSelectedCamera(videoDevices[0].deviceId);
+        setIsInitializing(false);
+        return;
+      } catch (error) {
+        console.error(error);
+        setCameraError('カメラの初期化に失敗しました');
+        setIsInitializing(false);
       }
-      setIsInitializing(false);
     };
-    getCameras();
+
+    initializeCamera();
+
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
@@ -69,22 +82,26 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   }, []);
 
   useEffect(() => {
-    // selectedCameraがセットされたらカメラを起動
     if (!selectedCamera) return;
     const startCamera = async () => {
       setIsInitializing(true);
       setCameraError('');
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { deviceId: { exact: selectedCamera }, width: { ideal: 1280 }, height: { ideal: 720 } }
-        });
+        const constraints = {
+          video: {
+            deviceId: { exact: selectedCamera },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
           streamRef.current = stream;
           await videoRef.current.play();
         }
-      } catch (e) {
-        console.error(e);
+      } catch (error) {
+        console.error(error);
         setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
       }
       setIsInitializing(false);
