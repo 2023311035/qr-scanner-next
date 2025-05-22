@@ -202,7 +202,15 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         )}
 
         <div className="bg-gray-800 p-4 rounded-lg shadow-sm">
-          <h3 className="text-lg font-semibold mb-3 text-white">スキャン履歴:</h3>
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-lg font-semibold text-white">スキャン履歴:</h3>
+            <button
+              onClick={() => setScannedCodes(new Set())}
+              className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+            >
+              履歴をクリア
+            </button>
+          </div>
           <ul className="space-y-2 max-h-[440px] overflow-y-auto pr-2">
             {Array.from(scannedCodes).map((code, index) => (
               <li key={index} className="p-3 bg-gray-700 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200">
