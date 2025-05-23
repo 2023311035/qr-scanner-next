@@ -3,8 +3,6 @@
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
 import { BrowserBarcodeReader, NotFoundException } from '@zxing/library';
-// @ts-ignore
-import { createScanner } from 'zbar.wasm';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -62,13 +60,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               }
             } else {
               // jsQRで見つからなければzbar.wasmで複数検出
-              // @ts-ignore
               if (window.ZBarWasm) {
-                // @ts-ignore
                 const scanner = await window.ZBarWasm.createScanner();
-                // @ts-ignore
                 const results = await scanner.scanImageData(imageData);
                 if (results && results.length > 0) {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   results.forEach((result: any) => {
                     if (!scannedCodes.has(result.data)) {
                       setScannedCodes(prev => {
