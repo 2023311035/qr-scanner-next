@@ -13,6 +13,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [qrLocations, setQrLocations] = useState<any[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -69,6 +70,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const results = await (scanner as any).scanImageData(imageData);
                 const newCodes: string[] = [];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const newLocations: any[] = [];
                 if (results && results.length > 0) {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -209,6 +211,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const results = await (scanner as any).scanImageData(imageData);
             const newCodes: string[] = [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const newLocations: any[] = [];
             if (results && results.length > 0) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -236,7 +239,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           // ガイド枠の描画
           if (qrLocations.length > 0) {
             context.save();
-            qrLocations.forEach(location => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            qrLocations.forEach((location: any) => {
               context.strokeStyle = 'red';
               context.lineWidth = 4;
               context.beginPath();
