@@ -20,6 +20,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const barcodeReaderRef = useRef<BrowserBarcodeReader | null>(null);
 
+  useEffect(() => {
+    // zbar.wasmのCDNスクリプトを動的に読み込む
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/zbar.wasm@latest/dist/zbar.js';
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, []);
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -51,8 +62,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               }
             } else {
               // jsQRで見つからなければzbar.wasmで複数検出
-              try {
-                const scanner = await createScanner();
+              // @ts-ignore
+              if (window.ZBarWasm) {
+                // @ts-ignore
+                const scanner = await window.ZBarWasm.createScanner();
+                // @ts-ignore
                 const results = await scanner.scanImageData(imageData);
                 if (results && results.length > 0) {
                   results.forEach((result: any) => {
@@ -66,28 +80,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                       onScanSuccess(result.data);
                     }
                   });
-                } else if (barcodeReaderRef.current) {
-                  // バーコードのスキャン（従来通り）
-                  try {
-                    const imageUrl = canvas.toDataURL();
-                    const result = await barcodeReaderRef.current.decodeFromImage(undefined, imageUrl);
-                    if (result && !scannedCodes.has(result.getText())) {
-                      setScannedCodes(prev => {
-                        const arr = Array.from(prev);
-                        arr.push(result.getText());
-                        return new Set(arr.slice(-10));
-                      });
-                      setLastScannedCode(result.getText());
-                      onScanSuccess(result.getText());
-                    }
-                  } catch (e) {
-                    if (!(e instanceof NotFoundException)) {
-                      console.error('バーコードの読み取りに失敗しました:', e);
-                    }
-                  }
                 }
-              } catch (e) {
-                console.error('zbar.wasmによる複数QR検出に失敗:', e);
               }
             }
           }
