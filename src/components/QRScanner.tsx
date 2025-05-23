@@ -61,8 +61,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             } else {
               // jsQRで見つからなければzbar.wasmで複数検出
               if (window.ZBarWasm) {
-                const scanner = await window.ZBarWasm.createScanner();
-                const results = await scanner.scanImageData(imageData);
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const scanner = await (window.ZBarWasm as any).createScanner();
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const results = await (scanner as any).scanImageData(imageData);
                 if (results && results.length > 0) {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   results.forEach((result: any) => {

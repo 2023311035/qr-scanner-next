@@ -1,3 +1,3 @@
 interface Window {
-  ZBarWasm?: any;
+  ZBarWasm?: unknown;
 } 
