@@ -13,6 +13,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
+  const [qrLocations, setQrLocations] = useState<any[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -49,6 +50,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             // まずjsQRでQRコードのスキャン
             const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
             if (qrCode) {
+              setQrLocations([qrCode.location]);
               if (!scannedCodes.has(qrCode.data)) {
                 setScannedCodes(prev => {
                   const arr = Array.from(prev);
@@ -59,6 +61,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 onScanSuccess(qrCode.data);
               }
             } else {
+              setQrLocations([]);
               // jsQRで見つからなければzbar.wasmで複数検出
               if (window.ZBarWasm) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -66,6 +69,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const results = await (scanner as any).scanImageData(imageData);
                 const newCodes: string[] = [];
+                const newLocations: any[] = [];
                 if (results && results.length > 0) {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   results.forEach((result: any) => {
@@ -78,10 +82,16 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                       newCodes.push(result.data);
                       onScanSuccess(result.data);
                     }
+                    if (result.location) {
+                      newLocations.push(result.location);
+                    }
                   });
                   if (newCodes.length > 0) {
                     setLastScannedCodes(newCodes);
                   }
+                  setQrLocations(newLocations);
+                } else {
+                  setQrLocations([]);
                 }
               }
             }
@@ -117,8 +127,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const constraints = {
           video: {
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -163,6 +173,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           // まずjsQRでQRコードを試す
           const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
           if (qrCode) {
+            setQrLocations([qrCode.location]);
             if (!scannedCodes.has(qrCode.data)) {
               setScannedCodes(prev => {
                 const arr = Array.from(prev);
@@ -173,6 +184,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               onScanSuccess(qrCode.data);
             }
           } else if (barcodeReaderRef.current) {
+            setQrLocations([]);
             // QRコードがなければ1次元バーコードを試す
             try {
               const imageUrl = canvas.toDataURL();
@@ -191,6 +203,51 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 // 何か他のエラーがあれば無視
               }
             }
+          } else if (window.ZBarWasm) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const scanner = await (window.ZBarWasm as any).createScanner();
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const results = await (scanner as any).scanImageData(imageData);
+            const newCodes: string[] = [];
+            const newLocations: any[] = [];
+            if (results && results.length > 0) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              results.forEach((result: any) => {
+                if (!scannedCodes.has(result.data)) {
+                  setScannedCodes(prev => {
+                    const arr = Array.from(prev);
+                    arr.push(result.data);
+                    return new Set(arr.slice(-10));
+                  });
+                  newCodes.push(result.data);
+                }
+                if (result.location) {
+                  newLocations.push(result.location);
+                }
+              });
+              if (newCodes.length > 0) {
+                setLastScannedCodes(newCodes);
+              }
+              setQrLocations(newLocations);
+            } else {
+              setQrLocations([]);
+            }
+          }
+          // ガイド枠の描画
+          if (qrLocations.length > 0) {
+            context.save();
+            qrLocations.forEach(location => {
+              context.strokeStyle = 'red';
+              context.lineWidth = 4;
+              context.beginPath();
+              context.moveTo(location.topLeftCorner.x, location.topLeftCorner.y);
+              context.lineTo(location.topRightCorner.x, location.topRightCorner.y);
+              context.lineTo(location.bottomRightCorner.x, location.bottomRightCorner.y);
+              context.lineTo(location.bottomLeftCorner.x, location.bottomLeftCorner.y);
+              context.closePath();
+              context.stroke();
+            });
+            context.restore();
           }
         }
       }
@@ -204,7 +261,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isInitializing, cameraError, scannedCodes, onScanSuccess]);
+  }, [isInitializing, cameraError, scannedCodes, onScanSuccess, qrLocations]);
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6 bg-gray-900 rounded-xl shadow-lg">
@@ -238,7 +295,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             />
             <canvas
               ref={canvasRef}
-              className="hidden"
+              className="absolute top-0 left-0 w-full h-full pointer-events-none"
             />
           </div>
           <div className="mt-4">
