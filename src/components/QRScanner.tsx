@@ -129,8 +129,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const constraints = {
           video: {
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
+            width: { ideal: 854 },
+            height: { ideal: 480 }
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
