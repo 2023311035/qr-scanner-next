@@ -12,7 +12,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
-  const [lastScannedCode, setLastScannedCode] = useState<string>('');
+  const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -55,7 +55,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   arr.push(qrCode.data);
                   return new Set(arr.slice(-10));
                 });
-                setLastScannedCode(qrCode.data);
+                setLastScannedCodes([qrCode.data]);
                 onScanSuccess(qrCode.data);
               }
             } else {
@@ -65,6 +65,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 const scanner = await (window.ZBarWasm as any).createScanner();
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const results = await (scanner as any).scanImageData(imageData);
+                const newCodes: string[] = [];
                 if (results && results.length > 0) {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   results.forEach((result: any) => {
@@ -74,10 +75,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                         arr.push(result.data);
                         return new Set(arr.slice(-10));
                       });
-                      setLastScannedCode(result.data);
+                      newCodes.push(result.data);
                       onScanSuccess(result.data);
                     }
                   });
+                  if (newCodes.length > 0) {
+                    setLastScannedCodes(newCodes);
+                  }
                 }
               }
             }
@@ -165,7 +169,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 arr.push(qrCode.data);
                 return new Set(arr.slice(-10));
               });
-              setLastScannedCode(qrCode.data);
+              setLastScannedCodes([qrCode.data]);
               onScanSuccess(qrCode.data);
             }
           } else if (barcodeReaderRef.current) {
@@ -179,7 +183,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   arr.push(result.getText());
                   return new Set(arr.slice(-10));
                 });
-                setLastScannedCode(result.getText());
+                setLastScannedCodes([result.getText()]);
                 onScanSuccess(result.getText());
               }
             } catch (e) {
@@ -251,21 +255,27 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         </>
       )}
       <div className="mt-6 space-y-6">
-        {lastScannedCode && (
+        {lastScannedCodes.length > 0 && (
           <div className="p-4 bg-gray-800 border border-green-700 rounded-lg shadow-sm">
             <h3 className="text-lg font-semibold mb-2 text-green-400">最新のスキャン結果:</h3>
-            {isValidUrl(lastScannedCode) ? (
-              <a 
-                href={lastScannedCode} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 break-all hover:underline"
-              >
-                {lastScannedCode}
-              </a>
-            ) : (
-              <p className="break-all text-gray-300">{lastScannedCode}</p>
-            )}
+            <ul className="space-y-1">
+              {lastScannedCodes.map((code, idx) => (
+                <li key={idx}>
+                  {isValidUrl(code) ? (
+                    <a 
+                      href={code} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 break-all hover:underline"
+                    >
+                      {code}
+                    </a>
+                  ) : (
+                    <p className="break-all text-gray-300">{code}</p>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
         <div className="bg-gray-800 p-4 rounded-lg shadow-sm">
