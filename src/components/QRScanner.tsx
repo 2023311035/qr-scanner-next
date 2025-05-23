@@ -129,8 +129,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const constraints = {
           video: {
             facingMode: { ideal: 'environment' },
-            width: { ideal: 854 },
-            height: { ideal: 480 }
+            aspectRatio: { ideal: 16/9 }
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -293,7 +292,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           <div className="relative rounded-lg overflow-hidden shadow-md bg-gray-800">
             <video
               ref={videoRef}
-              className="w-full h-64 object-cover"
+              className="w-full h-64 object-contain"
               playsInline
               muted
             />
