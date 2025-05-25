@@ -25,7 +25,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
-  const [qrLocations, setQrLocations] = useState<QRCodeLocation[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -70,7 +69,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             // まずjsQRでQRコードのスキャン
             const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
             if (qrCode) {
-              setQrLocations([qrCode.location]);
               if (!scannedCodes.has(qrCode.data)) {
                 setScannedCodes(prev => {
                   const arr = Array.from(prev);
@@ -81,18 +79,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 onScanSuccess(qrCode.data);
               }
             } else {
-              setQrLocations([]);
               // jsQRで見つからなければzbar.wasmで複数検出
               if (window.ZBarWasm) {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const scanner = await (window.ZBarWasm as any).createScanner();
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const results = await (scanner as any).scanImageData(imageData);
+                const scanner = await (window.ZBarWasm as { createScanner: () => Promise<{ scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> }> }).createScanner();
+                const results = await (scanner as { scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> }).scanImageData(imageData);
                 const newCodes: string[] = [];
-                const newLocations: QRCodeLocation[] = [];
                 if (results && results.length > 0) {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  results.forEach((result: any) => {
+                  results.forEach((result: ZBarResult) => {
                     if (!scannedCodes.has(result.data)) {
                       setScannedCodes(prev => {
                         const arr = Array.from(prev);
@@ -102,16 +95,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                       newCodes.push(result.data);
                       onScanSuccess(result.data);
                     }
-                    if (result.location) {
-                      newLocations.push(result.location);
-                    }
                   });
                   if (newCodes.length > 0) {
                     setLastScannedCodes(newCodes);
                   }
-                  setQrLocations(newLocations);
-                } else {
-                  setQrLocations([]);
                 }
               }
             }
@@ -269,9 +256,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             setLastScannedCodes(newCodes);
             newCodes.forEach(code => onScanSuccess(code));
           }
-
-          // 位置情報の更新
-          setQrLocations(newLocations);
 
           // ガイド枠の描画
           if (newLocations.length > 0) {
