@@ -67,22 +67,24 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
             
             // まずjsQRでQRコードのスキャン
-            const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
-            if (qrCode) {
-              if (!scannedCodes.has(qrCode.data)) {
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "dontInvert",
+            });
+            if (code) {
+              if (!scannedCodes.has(code.data)) {
                 setScannedCodes(prev => {
                   const arr = Array.from(prev);
-                  arr.push(qrCode.data);
+                  arr.push(code.data);
                   return new Set(arr.slice(-10));
                 });
-                setLastScannedCodes([qrCode.data]);
-                onScanSuccess(qrCode.data);
+                setLastScannedCodes([code.data]);
+                onScanSuccess(code.data);
               }
             } else {
               // jsQRで見つからなければzbar.wasmで複数検出
               if (window.ZBarWasm) {
                 const scanner = await (window.ZBarWasm as { createScanner: () => Promise<{ scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> }> }).createScanner();
-                const results = await (scanner as { scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> }).scanImageData(imageData);
+                const results = await scanner.scanImageData(imageData);
                 const newCodes: string[] = [];
                 if (results && results.length > 0) {
                   results.forEach((result: ZBarResult) => {
@@ -222,11 +224,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
           // 2. jsQRでQRコードを検出（zbarで見つからなかった場合のバックアップ）
           if (newCodes.length === 0) {
-            const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
-            if (qrCode && !scannedCodes.has(qrCode.data)) {
-              newCodes.push(qrCode.data);
-              if (qrCode.location) {
-                newLocations.push(qrCode.location);
+            const code = jsQR(imageData.data, imageData.width, imageData.height, {
+              inversionAttempts: "dontInvert",
+            });
+            if (code && !scannedCodes.has(code.data)) {
+              newCodes.push(code.data);
+              if (code.location) {
+                newLocations.push(code.location);
               }
             }
           }
