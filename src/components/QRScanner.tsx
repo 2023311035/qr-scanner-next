@@ -136,9 +136,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const constraints = {
           video: {
             facingMode: { ideal: 'environment' },
-            aspectRatio: { ideal: 16/9 },
-            width: { ideal: 8000, min: 3840 },
-            height: { ideal: 6000, min: 2160 },
+            aspectRatio: { ideal: 4/3 },  // iPhone 15のメインカメラのアスペクト比
+            width: { ideal: 8064, min: 3840 },
+            height: { ideal: 6048, min: 2160 },
             frameRate: { ideal: 60, min: 30 }
           }
         };
