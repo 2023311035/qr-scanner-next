@@ -8,19 +8,29 @@ interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
 }
 
+interface QRCodeLocation {
+  topLeftCorner: { x: number; y: number };
+  topRightCorner: { x: number; y: number };
+  bottomRightCorner: { x: number; y: number };
+  bottomLeftCorner: { x: number; y: number };
+}
+
+interface ZBarResult {
+  data: string;
+  location?: QRCodeLocation;
+}
+
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [qrLocations, setQrLocations] = useState<any[]>([]);
+  const [qrLocations, setQrLocations] = useState<QRCodeLocation[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const barcodeReaderRef = useRef<BrowserBarcodeReader | null>(null);
-  // zbarScannerを保持
-  const zbarScannerRef = useRef<any>(null);
+  const zbarScannerRef = useRef<{ scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> } | null>(null);
 
   useEffect(() => {
     // zbar.wasmのCDNスクリプトを動的に読み込む
@@ -31,7 +41,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     // スクリプト読み込み後にzbarScannerを初期化
     script.onload = async () => {
       if (window.ZBarWasm) {
-        zbarScannerRef.current = await (window.ZBarWasm as any).createScanner();
+        zbarScannerRef.current = await (window.ZBarWasm as { createScanner: () => Promise<{ scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> }> }).createScanner();
       }
     };
     return () => {
@@ -79,8 +89,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const results = await (scanner as any).scanImageData(imageData);
                 const newCodes: string[] = [];
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const newLocations: any[] = [];
+                const newLocations: QRCodeLocation[] = [];
                 if (results && results.length > 0) {
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   results.forEach((result: any) => {
@@ -183,12 +192,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
           // まずzbar.wasmで複数検出を試みる
           if (zbarScannerRef.current) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const results = await (zbarScannerRef.current as any).scanImageData(imageData);
-            let newCodes: string[] = [];
-            let newLocations: any[] = [];
+            const results = await zbarScannerRef.current.scanImageData(imageData);
+            const newCodes: string[] = [];
+            const newLocations: QRCodeLocation[] = [];
             if (results && results.length > 0) {
-              results.forEach((result: any) => {
+              results.forEach((result: ZBarResult) => {
                 if (!scannedCodes.has(result.data)) {
                   newCodes.push(result.data);
                 }
@@ -211,12 +219,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             }
           } else if (window.ZBarWasm) {
             // fallback: もしrefがまだ初期化されていなければ従来通り
-            const scanner = await (window.ZBarWasm as any).createScanner();
-            const results = await (scanner as any).scanImageData(imageData);
-            let newCodes: string[] = [];
-            let newLocations: any[] = [];
+            const scanner = await (window.ZBarWasm as { createScanner: () => Promise<{ scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> }> }).createScanner();
+            const results = await scanner.scanImageData(imageData);
+            const newCodes: string[] = [];
+            const newLocations: QRCodeLocation[] = [];
             if (results && results.length > 0) {
-              results.forEach((result: any) => {
+              results.forEach((result: ZBarResult) => {
                 if (!scannedCodes.has(result.data)) {
                   newCodes.push(result.data);
                 }
