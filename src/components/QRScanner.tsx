@@ -137,8 +137,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           video: {
             facingMode: { ideal: 'environment' },
             aspectRatio: { ideal: 16/9 },
-            width: { ideal: 3840, min: 3840 },
-            height: { ideal: 2160, min: 2160 },
+            width: { ideal: 8000, min: 3840 },
+            height: { ideal: 6000, min: 2160 },
             frameRate: { ideal: 60, min: 30 }
           }
         };
