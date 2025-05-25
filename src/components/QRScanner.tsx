@@ -211,12 +211,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
-          // まずzbar.wasmで複数検出を試みる
+          const newCodes: string[] = [];
+          const newLocations: QRCodeLocation[] = [];
+
+          // 1. まずzbar.wasmで複数のQRコードを検出
           if (zbarScannerRef.current) {
             try {
               const results = await zbarScannerRef.current.scanImageData(imageData);
-              const newCodes: string[] = [];
-              const newLocations: QRCodeLocation[] = [];
               if (results && results.length > 0) {
                 results.forEach((result: ZBarResult) => {
                   if (!scannedCodes.has(result.data)) {
@@ -226,92 +227,56 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     newLocations.push(result.location);
                   }
                 });
-                if (newCodes.length > 0) {
-                  setScannedCodes(prev => {
-                    const arr = Array.from(prev);
-                    arr.push(...newCodes);
-                    return new Set(arr.slice(-10));
-                  });
-                  setLastScannedCodes(newCodes);
-                  newCodes.forEach(code => onScanSuccess(code));
-                }
-                setQrLocations(newLocations);
-              } else {
-                setQrLocations([]);
               }
             } catch (error) {
               console.error('ZBar scanning error:', error);
             }
-          } else if (window.ZBarWasm) {
-            // fallback: もしrefがまだ初期化されていなければ従来通り
-            const scanner = await (window.ZBarWasm as { createScanner: () => Promise<{ scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> }> }).createScanner();
-            const results = await scanner.scanImageData(imageData);
-            const newCodes: string[] = [];
-            const newLocations: QRCodeLocation[] = [];
-            if (results && results.length > 0) {
-              results.forEach((result: ZBarResult) => {
-                if (!scannedCodes.has(result.data)) {
-                  newCodes.push(result.data);
-                }
-                if (result.location) {
-                  newLocations.push(result.location);
-                }
-              });
-              if (newCodes.length > 0) {
-                setScannedCodes(prev => {
-                  const arr = Array.from(prev);
-                  arr.push(...newCodes);
-                  return new Set(arr.slice(-10));
-                });
-                setLastScannedCodes(newCodes);
-                newCodes.forEach(code => onScanSuccess(code));
-              }
-              setQrLocations(newLocations);
-            } else {
-              setQrLocations([]);
-            }
-          } else {
-            // zbar.wasmがなければjsQRで1つだけ検出
+          }
+
+          // 2. jsQRでQRコードを検出（zbarで見つからなかった場合のバックアップ）
+          if (newCodes.length === 0) {
             const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
-            if (qrCode) {
-              setQrLocations([qrCode.location]);
-              if (!scannedCodes.has(qrCode.data)) {
-                setScannedCodes(prev => {
-                  const arr = Array.from(prev);
-                  arr.push(qrCode.data);
-                  return new Set(arr.slice(-10));
-                });
-                setLastScannedCodes([qrCode.data]);
-                onScanSuccess(qrCode.data);
-              }
-            } else if (barcodeReaderRef.current) {
-              setQrLocations([]);
-              // QRコードがなければ1次元バーコードを試す
-              try {
-                const imageUrl = canvas.toDataURL();
-                const result = await barcodeReaderRef.current.decodeFromImage(undefined, imageUrl);
-                if (result && !scannedCodes.has(result.getText())) {
-                  setScannedCodes(prev => {
-                    const arr = Array.from(prev);
-                    arr.push(result.getText());
-                    return new Set(arr.slice(-10));
-                  });
-                  setLastScannedCodes([result.getText()]);
-                  onScanSuccess(result.getText());
-                }
-              } catch (e) {
-                if (!(e instanceof NotFoundException)) {
-                  // 何か他のエラーがあれば無視
-                }
+            if (qrCode && !scannedCodes.has(qrCode.data)) {
+              newCodes.push(qrCode.data);
+              if (qrCode.location) {
+                newLocations.push(qrCode.location);
               }
             }
           }
 
+          // 3. バーコードを検出
+          if (barcodeReaderRef.current) {
+            try {
+              const imageUrl = canvas.toDataURL();
+              const result = await barcodeReaderRef.current.decodeFromImage(undefined, imageUrl);
+              if (result && !scannedCodes.has(result.getText())) {
+                newCodes.push(result.getText());
+              }
+            } catch (e) {
+              if (!(e instanceof NotFoundException)) {
+                console.error('Barcode scanning error:', e);
+              }
+            }
+          }
+
+          // 新しいコードが見つかった場合の処理
+          if (newCodes.length > 0) {
+            setScannedCodes(prev => {
+              const arr = Array.from(prev);
+              arr.push(...newCodes);
+              return new Set(arr.slice(-10));
+            });
+            setLastScannedCodes(newCodes);
+            newCodes.forEach(code => onScanSuccess(code));
+          }
+
+          // 位置情報の更新
+          setQrLocations(newLocations);
+
           // ガイド枠の描画
-          if (qrLocations.length > 0) {
+          if (newLocations.length > 0) {
             context.save();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            qrLocations.forEach((location: any) => {
+            newLocations.forEach((location: QRCodeLocation) => {
               context.strokeStyle = 'red';
               context.lineWidth = 4;
               context.beginPath();
