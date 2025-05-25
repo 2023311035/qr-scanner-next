@@ -171,40 +171,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           canvas.height = video.videoHeight;
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-          // まずjsQRでQRコードを試す
-          const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
-          if (qrCode) {
-            setQrLocations([qrCode.location]);
-            if (!scannedCodes.has(qrCode.data)) {
-              setScannedCodes(prev => {
-                const arr = Array.from(prev);
-                arr.push(qrCode.data);
-                return new Set(arr.slice(-10));
-              });
-              setLastScannedCodes([qrCode.data]);
-              onScanSuccess(qrCode.data);
-            }
-          } else if (barcodeReaderRef.current) {
-            setQrLocations([]);
-            // QRコードがなければ1次元バーコードを試す
-            try {
-              const imageUrl = canvas.toDataURL();
-              const result = await barcodeReaderRef.current.decodeFromImage(undefined, imageUrl);
-              if (result && !scannedCodes.has(result.getText())) {
-                setScannedCodes(prev => {
-                  const arr = Array.from(prev);
-                  arr.push(result.getText());
-                  return new Set(arr.slice(-10));
-                });
-                setLastScannedCodes([result.getText()]);
-                onScanSuccess(result.getText());
-              }
-            } catch (e) {
-              if (!(e instanceof NotFoundException)) {
-                // 何か他のエラーがあれば無視
-              }
-            }
-          } else if (window.ZBarWasm) {
+
+          // まずzbar.wasmで複数検出を試みる
+          if (window.ZBarWasm) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const scanner = await (window.ZBarWasm as any).createScanner();
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -222,6 +191,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     return new Set(arr.slice(-10));
                   });
                   newCodes.push(result.data);
+                  onScanSuccess(result.data);
                 }
                 if (result.location) {
                   newLocations.push(result.location);
@@ -234,7 +204,43 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             } else {
               setQrLocations([]);
             }
+          } else {
+            // zbar.wasmがなければjsQRで1つだけ検出
+            const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+            if (qrCode) {
+              setQrLocations([qrCode.location]);
+              if (!scannedCodes.has(qrCode.data)) {
+                setScannedCodes(prev => {
+                  const arr = Array.from(prev);
+                  arr.push(qrCode.data);
+                  return new Set(arr.slice(-10));
+                });
+                setLastScannedCodes([qrCode.data]);
+                onScanSuccess(qrCode.data);
+              }
+            } else if (barcodeReaderRef.current) {
+              setQrLocations([]);
+              // QRコードがなければ1次元バーコードを試す
+              try {
+                const imageUrl = canvas.toDataURL();
+                const result = await barcodeReaderRef.current.decodeFromImage(undefined, imageUrl);
+                if (result && !scannedCodes.has(result.getText())) {
+                  setScannedCodes(prev => {
+                    const arr = Array.from(prev);
+                    arr.push(result.getText());
+                    return new Set(arr.slice(-10));
+                  });
+                  setLastScannedCodes([result.getText()]);
+                  onScanSuccess(result.getText());
+                }
+              } catch (e) {
+                if (!(e instanceof NotFoundException)) {
+                  // 何か他のエラーがあれば無視
+                }
+              }
+            }
           }
+
           // ガイド枠の描画
           if (qrLocations.length > 0) {
             context.save();
