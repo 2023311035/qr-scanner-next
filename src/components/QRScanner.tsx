@@ -19,6 +19,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const barcodeReaderRef = useRef<BrowserBarcodeReader | null>(null);
+  // zbarScannerを保持
+  const zbarScannerRef = useRef<any>(null);
 
   useEffect(() => {
     // zbar.wasmのCDNスクリプトを動的に読み込む
@@ -26,8 +28,15 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     script.src = 'https://cdn.jsdelivr.net/npm/zbar.wasm@latest/dist/zbar.js';
     script.async = true;
     document.body.appendChild(script);
+    // スクリプト読み込み後にzbarScannerを初期化
+    script.onload = async () => {
+      if (window.ZBarWasm) {
+        zbarScannerRef.current = await (window.ZBarWasm as any).createScanner();
+      }
+    };
     return () => {
       document.body.removeChild(script);
+      zbarScannerRef.current = null;
     };
   }, []);
 
@@ -173,32 +182,56 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
           // まずzbar.wasmで複数検出を試みる
-          if (window.ZBarWasm) {
+          if (zbarScannerRef.current) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const scanner = await (window.ZBarWasm as any).createScanner();
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const results = await (scanner as any).scanImageData(imageData);
-            const newCodes: string[] = [];
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const newLocations: any[] = [];
+            const results = await (zbarScannerRef.current as any).scanImageData(imageData);
+            let newCodes: string[] = [];
+            let newLocations: any[] = [];
             if (results && results.length > 0) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               results.forEach((result: any) => {
                 if (!scannedCodes.has(result.data)) {
-                  setScannedCodes(prev => {
-                    const arr = Array.from(prev);
-                    arr.push(result.data);
-                    return new Set(arr.slice(-10));
-                  });
                   newCodes.push(result.data);
-                  onScanSuccess(result.data);
                 }
                 if (result.location) {
                   newLocations.push(result.location);
                 }
               });
               if (newCodes.length > 0) {
+                setScannedCodes(prev => {
+                  const arr = Array.from(prev);
+                  arr.push(...newCodes);
+                  return new Set(arr.slice(-10));
+                });
                 setLastScannedCodes(newCodes);
+                newCodes.forEach(code => onScanSuccess(code));
+              }
+              setQrLocations(newLocations);
+            } else {
+              setQrLocations([]);
+            }
+          } else if (window.ZBarWasm) {
+            // fallback: もしrefがまだ初期化されていなければ従来通り
+            const scanner = await (window.ZBarWasm as any).createScanner();
+            const results = await (scanner as any).scanImageData(imageData);
+            let newCodes: string[] = [];
+            let newLocations: any[] = [];
+            if (results && results.length > 0) {
+              results.forEach((result: any) => {
+                if (!scannedCodes.has(result.data)) {
+                  newCodes.push(result.data);
+                }
+                if (result.location) {
+                  newLocations.push(result.location);
+                }
+              });
+              if (newCodes.length > 0) {
+                setScannedCodes(prev => {
+                  const arr = Array.from(prev);
+                  arr.push(...newCodes);
+                  return new Set(arr.slice(-10));
+                });
+                setLastScannedCodes(newCodes);
+                newCodes.forEach(code => onScanSuccess(code));
               }
               setQrLocations(newLocations);
             } else {
