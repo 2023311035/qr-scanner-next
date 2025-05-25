@@ -133,13 +133,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           return;
         }
 
-        const constraints = {
+        const constraints: MediaStreamConstraints = {
           video: {
             facingMode: { ideal: 'environment' },
-            aspectRatio: { ideal: 4/3 },  // iPhone 15のメインカメラのアスペクト比
+            aspectRatio: { ideal: 4/3 },
             width: { ideal: 8064, min: 3840 },
             height: { ideal: 6048, min: 2160 },
-            frameRate: { ideal: 60, min: 30 }
+            frameRate: { ideal: 120, min: 60 }  // フレームレートを120fpsに引き上げ
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
