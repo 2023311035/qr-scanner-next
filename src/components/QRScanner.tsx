@@ -147,7 +147,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const constraints = {
           video: {
             facingMode: { ideal: 'environment' },
-            aspectRatio: { ideal: 16/9 }
+            aspectRatio: { ideal: 16/9 },
+            width: { ideal: 3840, min: 1920 },
+            height: { ideal: 2160, min: 1080 },
+            frameRate: { ideal: 60, min: 30 }
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -179,43 +182,65 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
   useEffect(() => {
     let animationFrameId: number;
+    let lastScanTime = 0;
+    const SCAN_INTERVAL = 100; // スキャン間隔を100msに設定
+
     const scanCodes = async () => {
       if (videoRef.current && canvasRef.current) {
         const video = videoRef.current;
         const canvas = canvasRef.current;
         const context = canvas.getContext('2d');
         if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
+          const currentTime = Date.now();
+          if (currentTime - lastScanTime < SCAN_INTERVAL) {
+            animationFrameId = requestAnimationFrame(scanCodes);
+            return;
+          }
+          lastScanTime = currentTime;
+
+          // キャンバスのサイズを最適化
+          const videoWidth = video.videoWidth;
+          const videoHeight = video.videoHeight;
+          const scale = Math.min(window.innerWidth / videoWidth, window.innerHeight / videoHeight);
+          canvas.width = videoWidth * scale;
+          canvas.height = videoHeight * scale;
+
+          // 高品質な描画
+          context.imageSmoothingEnabled = true;
+          context.imageSmoothingQuality = 'high';
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
           // まずzbar.wasmで複数検出を試みる
           if (zbarScannerRef.current) {
-            const results = await zbarScannerRef.current.scanImageData(imageData);
-            const newCodes: string[] = [];
-            const newLocations: QRCodeLocation[] = [];
-            if (results && results.length > 0) {
-              results.forEach((result: ZBarResult) => {
-                if (!scannedCodes.has(result.data)) {
-                  newCodes.push(result.data);
-                }
-                if (result.location) {
-                  newLocations.push(result.location);
-                }
-              });
-              if (newCodes.length > 0) {
-                setScannedCodes(prev => {
-                  const arr = Array.from(prev);
-                  arr.push(...newCodes);
-                  return new Set(arr.slice(-10));
+            try {
+              const results = await zbarScannerRef.current.scanImageData(imageData);
+              const newCodes: string[] = [];
+              const newLocations: QRCodeLocation[] = [];
+              if (results && results.length > 0) {
+                results.forEach((result: ZBarResult) => {
+                  if (!scannedCodes.has(result.data)) {
+                    newCodes.push(result.data);
+                  }
+                  if (result.location) {
+                    newLocations.push(result.location);
+                  }
                 });
-                setLastScannedCodes(newCodes);
-                newCodes.forEach(code => onScanSuccess(code));
+                if (newCodes.length > 0) {
+                  setScannedCodes(prev => {
+                    const arr = Array.from(prev);
+                    arr.push(...newCodes);
+                    return new Set(arr.slice(-10));
+                  });
+                  setLastScannedCodes(newCodes);
+                  newCodes.forEach(code => onScanSuccess(code));
+                }
+                setQrLocations(newLocations);
+              } else {
+                setQrLocations([]);
               }
-              setQrLocations(newLocations);
-            } else {
-              setQrLocations([]);
+            } catch (error) {
+              console.error('ZBar scanning error:', error);
             }
           } else if (window.ZBarWasm) {
             // fallback: もしrefがまだ初期化されていなければ従来通り
@@ -303,15 +328,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       }
       animationFrameId = requestAnimationFrame(scanCodes);
     };
+
     if (!isInitializing && !cameraError) {
       scanCodes();
     }
+
     return () => {
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isInitializing, cameraError, scannedCodes, onScanSuccess, qrLocations]);
+  }, [isInitializing, cameraError, scannedCodes, onScanSuccess]);
 
   return (
     <div className="w-full max-w-2xl mx-auto p-6 bg-gray-900 rounded-xl shadow-lg">
@@ -347,6 +374,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               ref={canvasRef}
               className="absolute top-0 left-0 w-full h-full pointer-events-none"
             />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-64 h-64 border-2 border-white rounded-lg relative">
+                <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-white"></div>
+                <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-white"></div>
+                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-white"></div>
+                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-white"></div>
+              </div>
+            </div>
+            <div className="absolute bottom-4 left-0 right-0 text-center text-white text-sm bg-black bg-opacity-50 py-2">
+              QRコードを枠内に配置してください
+            </div>
           </div>
           <div className="mt-4">
             <label className="block w-full p-4 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
