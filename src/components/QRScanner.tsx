@@ -325,17 +325,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               ref={canvasRef}
               className="absolute top-0 left-0 w-full h-full pointer-events-none"
             />
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-64 h-64 border-2 border-white rounded-lg relative">
-                <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-white"></div>
-                <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-white"></div>
-                <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-white"></div>
-                <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-white"></div>
-              </div>
-            </div>
-            <div className="absolute bottom-4 left-0 right-0 text-center text-white text-sm bg-black bg-opacity-50 py-2">
-              QRコードを枠内に配置してください
-            </div>
           </div>
           <div className="mt-4">
             <label className="block w-full p-4 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
