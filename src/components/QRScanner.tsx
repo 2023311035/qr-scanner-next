@@ -136,9 +136,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const constraints: MediaStreamConstraints = {
           video: {
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1920, min: 1280 },
-            height: { ideal: 1080, min: 720 },
-            frameRate: { ideal: 120, min: 60 }  // フレームレートを120fpsに引き上げ
+            width: { ideal: 1280 },     // HD画質（十分に高画質）
+            height: { ideal: 720 },
+            frameRate: { ideal: 30, min: 15 }  // WebKitに現実的な要求
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
