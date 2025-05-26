@@ -138,7 +138,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             facingMode: { ideal: 'environment' },
             width: { ideal: 1280 },     // HD画質（十分に高画質）
             height: { ideal: 720 },
-            frameRate: { ideal: 30, min: 15 }  // WebKitに現実的な要求
+            frameRate: { ideal: 60, min: 30 }  // フレームレートを60fpsに引き上げ
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -179,7 +179,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const context = canvas.getContext('2d');
         if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
           const currentTime = Date.now();
-          if (currentTime - lastScanTime < 100) {  // スキャン間隔は100msを維持
+          if (currentTime - lastScanTime < 50) {  // スキャン間隔を50msに短縮
             animationFrameId = requestAnimationFrame(scanCodes);
             return;
           }
@@ -188,19 +188,19 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           // キャンバスのサイズを最適化（画質を維持しつつ処理を軽く）
           const videoWidth = video.videoWidth;
           const videoHeight = video.videoHeight;
-          const scale = Math.min(window.innerWidth / videoWidth, window.innerHeight / videoHeight) * 0.8;  // スケールを0.8倍に調整
+          const scale = Math.min(window.innerWidth / videoWidth, window.innerHeight / videoHeight) * 0.8;  // スケールは0.8倍を維持
           canvas.width = videoWidth * scale;
           canvas.height = videoHeight * scale;
 
           // 高品質な描画設定
           context.imageSmoothingEnabled = true;
-          context.imageSmoothingQuality = 'high';  // 品質をhighに戻す
+          context.imageSmoothingQuality = 'high';  // 高品質を維持
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
           // 画像のコントラストを強調（適度な調整）
-          const contrast = 1.15;  // コントラストを15%に調整
-          const brightness = 1.08;  // 明るさを8%に調整
+          const contrast = 1.15;  // コントラストは15%を維持
+          const brightness = 1.08;  // 明るさは8%を維持
           for (let i = 0; i < imageData.data.length; i += 4) {
             imageData.data[i] = ((imageData.data[i] - 128) * contrast + 128) * brightness;
             imageData.data[i + 1] = ((imageData.data[i + 1] - 128) * contrast + 128) * brightness;
