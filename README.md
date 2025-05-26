@@ -1,4 +1,81 @@
-# QR Scanner Next.js App
+# QRコードスキャナー
+
+## 概要
+このプロジェクトは、Webブラウザ上で動作する高精度なQRコード・バーコードスキャナーアプリケーションです。デバイスのカメラを使用してリアルタイムでQRコードやバーコードをスキャンし、その内容を表示・管理することができます。
+
+## 主な機能
+- リアルタイムQRコード・バーコードスキャン
+  - 高解像度カメラ対応（iPhone 15の48MPカメラ等）
+  - 60fpsの滑らかな動画処理
+  - 複数のQRコードを同時に検出
+- 画像ファイルからのQRコード・バーコード読み取り
+- スキャン履歴の管理
+- レスポンシブデザイン対応
+- ダークモード対応
+
+## 技術スタック
+- Next.js 14
+- TypeScript
+- jsQR
+- zbar.wasm
+- @zxing/library
+- Tailwind CSS
+- shadcn/ui
+
+## 動作環境
+- モダンブラウザ（Chrome, Safari, Firefox等）
+- カメラ機能をサポートするデバイス
+- モバイルデバイス（iOS, Android）対応
+
+## セットアップ手順
+1. リポジトリのクローン
+```bash
+git clone https://github.com/2023311035/qr-scanner-next.git
+```
+
+2. 依存関係のインストール
+```bash
+npm install
+```
+
+3. 開発サーバーの起動
+```bash
+npm run dev
+```
+
+4. ビルド
+```bash
+npm run build
+```
+
+## 使用方法
+1. カメラを起動し、QRコードやバーコードをスキャン
+2. スキャンしたコードの内容が表示されます
+3. 画像ファイルからも読み取り可能
+4. スキャン履歴は自動的に保存されます
+
+## カメラ設定
+- 解像度: 最大8064x6048（48MP相当）
+- フレームレート: 60fps
+- アスペクト比: 4:3
+- スキャン間隔: 50ms
+
+## 注意事項
+- カメラの使用許可が必要です
+- 高解像度のカメラを推奨します
+- 良好な照明条件での使用を推奨します
+
+## デプロイメント
+このプロジェクトはVercelで自動デプロイされています。mainブランチへのプッシュで自動的にデプロイが実行されます。
+
+## 開発者向け情報
+- ホットリロードによる開発効率の向上
+- TypeScriptによる型安全な開発
+- VercelのGeistフォントを使用した最適化されたタイポグラフィ
+- shadcn/uiによるモダンなUIコンポーネント
+
+## ライセンス
+MITライセンス
 
 This is a QR code scanner web application built with Next.js.
 
@@ -54,6 +131,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
 ## 機能説明
 
 このプロジェクトは Next.js を使用した Web アプリケーションです。主な機能は以下の通りです：
