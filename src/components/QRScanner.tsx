@@ -138,7 +138,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             facingMode: { ideal: 'environment' },
             width: { ideal: 1920, min: 1280 },
             height: { ideal: 1080, min: 720 },
-            frameRate: { ideal: 60, min: 30 }  // フレームレートを60fpsに引き上げ
+            frameRate: { ideal: 120, min: 60 }  // フレームレートを120fpsに引き上げ
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -179,7 +179,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const context = canvas.getContext('2d');
         if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
           const currentTime = Date.now();
-          if (currentTime - lastScanTime < 50) {
+          if (currentTime - lastScanTime < 33) {  // スキャン間隔を33ms（約30fps）に短縮
             animationFrameId = requestAnimationFrame(scanCodes);
             return;
           }
