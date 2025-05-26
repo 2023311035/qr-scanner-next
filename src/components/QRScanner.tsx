@@ -136,9 +136,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const constraints: MediaStreamConstraints = {
           video: {
             facingMode: { ideal: 'environment' },
-            width: { ideal: 1920, min: 1280 },  // フルHD希望
+            width: { ideal: 1920, min: 1280 },
             height: { ideal: 1080, min: 720 },
-            frameRate: { ideal: 30 }
+            frameRate: { ideal: 60, min: 30 }  // フレームレートを60fpsに引き上げ
           }
         };
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
@@ -171,7 +171,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   useEffect(() => {
     let animationFrameId: number;
     let lastScanTime = 0;
-    const SCAN_INTERVAL = 100; // スキャン間隔を100msに設定
 
     const scanCodes = async () => {
       if (videoRef.current && canvasRef.current) {
@@ -180,16 +179,16 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const context = canvas.getContext('2d');
         if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
           const currentTime = Date.now();
-          if (currentTime - lastScanTime < SCAN_INTERVAL) {
+          if (currentTime - lastScanTime < 50) {  // スキャン間隔を50msに短縮
             animationFrameId = requestAnimationFrame(scanCodes);
             return;
           }
           lastScanTime = currentTime;
 
-          // キャンバスのサイズを最適化
+          // キャンバスのサイズを最適化（処理を軽くするため）
           const videoWidth = video.videoWidth;
           const videoHeight = video.videoHeight;
-          const scale = Math.min(window.innerWidth / videoWidth, window.innerHeight / videoHeight);
+          const scale = Math.min(window.innerWidth / videoWidth, window.innerHeight / videoHeight) * 0.8;  // スケールを0.8倍に縮小
           canvas.width = videoWidth * scale;
           canvas.height = videoHeight * scale;
 
