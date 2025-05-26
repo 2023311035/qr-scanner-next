@@ -179,24 +179,34 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const context = canvas.getContext('2d');
         if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
           const currentTime = Date.now();
-          if (currentTime - lastScanTime < 50) {  // スキャン間隔を50msに短縮
+          if (currentTime - lastScanTime < 50) {
             animationFrameId = requestAnimationFrame(scanCodes);
             return;
           }
           lastScanTime = currentTime;
 
-          // キャンバスのサイズを最適化（処理を軽くするため）
+          // キャンバスのサイズを最適化（高解像度を維持）
           const videoWidth = video.videoWidth;
           const videoHeight = video.videoHeight;
-          const scale = Math.min(window.innerWidth / videoWidth, window.innerHeight / videoHeight) * 0.8;  // スケールを0.8倍に縮小
+          const scale = Math.min(window.innerWidth / videoWidth, window.innerHeight / videoHeight);
           canvas.width = videoWidth * scale;
           canvas.height = videoHeight * scale;
 
-          // 高品質な描画
+          // 高品質な描画設定
           context.imageSmoothingEnabled = true;
           context.imageSmoothingQuality = 'high';
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+          // 画像のコントラストを強調
+          const contrast = 1.2;  // コントラストを20%上げる
+          const brightness = 1.1;  // 明るさを10%上げる
+          for (let i = 0; i < imageData.data.length; i += 4) {
+            imageData.data[i] = ((imageData.data[i] - 128) * contrast + 128) * brightness;
+            imageData.data[i + 1] = ((imageData.data[i + 1] - 128) * contrast + 128) * brightness;
+            imageData.data[i + 2] = ((imageData.data[i + 2] - 128) * contrast + 128) * brightness;
+          }
+          context.putImageData(imageData, 0, 0);
 
           const newCodes: string[] = [];
           const newLocations: QRCodeLocation[] = [];
