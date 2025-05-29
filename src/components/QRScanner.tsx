@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
-import { BrowserBarcodeReader, NotFoundException } from '@zxing/library';
+import Quagga from 'quagga';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -28,7 +28,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const barcodeReaderRef = useRef<BrowserBarcodeReader | null>(null);
   const zbarScannerRef = useRef<{ scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> } | null>(null);
 
   useEffect(() => {
@@ -133,40 +132,61 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           return;
         }
 
-        const constraints: MediaStreamConstraints = {
-          video: {
-            facingMode: { ideal: 'environment' },
-            width: { ideal: 1280 },     // HD画質（十分に高画質）
-            height: { ideal: 720 },
-            frameRate: { ideal: 60, min: 30 }  // フレームレートを60fpsに引き上げ
+        // Quaggaの初期化
+        await Quagga.init({
+          inputStream: {
+            name: "Live",
+            type: "LiveStream",
+            target: videoRef.current,
+            constraints: {
+              facingMode: "environment",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 60, min: 30 }
+            },
+          },
+          decoder: {
+            readers: [
+              "ean_reader",
+              "ean_8_reader",
+              "code_128_reader",
+              "code_39_reader",
+              "upc_reader",
+              "upc_e_reader"
+            ],
+            multiple: true
           }
-        };
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          streamRef.current = stream;
-          await videoRef.current.play();
-        }
+        });
+
+        // バーコード検出イベントのリスナー
+        Quagga.onDetected((result) => {
+          const code = result.codeResult.code;
+          if (!scannedCodes.has(code)) {
+            setScannedCodes(prev => {
+              const arr = Array.from(prev);
+              arr.push(code);
+              return new Set(arr.slice(-10));
+            });
+            setLastScannedCodes([code]);
+            onScanSuccess(code);
+          }
+        });
+
+        // Quaggaの開始
+        await Quagga.start();
         setIsInitializing(false);
-      } catch {
+      } catch (error) {
         setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
         setIsInitializing(false);
       }
     };
-    initializeCamera();
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
-    };
-  }, []);
 
-  useEffect(() => {
-    barcodeReaderRef.current = new BrowserBarcodeReader();
+    initializeCamera();
+
     return () => {
-      barcodeReaderRef.current?.reset();
+      Quagga.stop();
     };
-  }, []);
+  }, [scannedCodes, onScanSuccess]);
 
   useEffect(() => {
     let animationFrameId: number;
@@ -179,28 +199,25 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const context = canvas.getContext('2d');
         if (context && video.readyState === video.HAVE_ENOUGH_DATA) {
           const currentTime = Date.now();
-          if (currentTime - lastScanTime < 50) {  // スキャン間隔を50msに短縮
+          if (currentTime - lastScanTime < 50) {
             animationFrameId = requestAnimationFrame(scanCodes);
             return;
           }
           lastScanTime = currentTime;
 
-          // キャンバスのサイズを最適化（画質を維持しつつ処理を軽く）
           const videoWidth = video.videoWidth;
           const videoHeight = video.videoHeight;
-          const scale = Math.min(window.innerWidth / videoWidth, window.innerHeight / videoHeight) * 0.8;  // スケールは0.8倍を維持
+          const scale = Math.min(window.innerWidth / videoWidth, window.innerHeight / videoHeight) * 0.8;
           canvas.width = videoWidth * scale;
           canvas.height = videoHeight * scale;
 
-          // 高品質な描画設定
           context.imageSmoothingEnabled = true;
-          context.imageSmoothingQuality = 'high';  // 高品質を維持
+          context.imageSmoothingQuality = 'high';
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
           const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
 
-          // 画像のコントラストを強調（適度な調整）
-          const contrast = 1.15;  // コントラストは15%を維持
-          const brightness = 1.08;  // 明るさは8%を維持
+          const contrast = 1.15;
+          const brightness = 1.08;
           for (let i = 0; i < imageData.data.length; i += 4) {
             imageData.data[i] = ((imageData.data[i] - 128) * contrast + 128) * brightness;
             imageData.data[i + 1] = ((imageData.data[i + 1] - 128) * contrast + 128) * brightness;
@@ -211,7 +228,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const newCodes: string[] = [];
           const newLocations: QRCodeLocation[] = [];
 
-          // 1. まずzbar.wasmで複数のQRコードを検出
+          // QRコードの検出
           if (zbarScannerRef.current) {
             try {
               const results = await zbarScannerRef.current.scanImageData(imageData);
@@ -230,7 +247,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             }
           }
 
-          // 2. jsQRでQRコードを検出（zbarで見つからなかった場合のバックアップ）
           if (newCodes.length === 0) {
             const code = jsQR(imageData.data, imageData.width, imageData.height, {
               inversionAttempts: "dontInvert",
@@ -243,22 +259,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             }
           }
 
-          // 3. バーコードを検出
-          if (barcodeReaderRef.current) {
-            try {
-              const imageUrl = canvas.toDataURL();
-              const result = await barcodeReaderRef.current.decodeFromImage(undefined, imageUrl);
-              if (result && !scannedCodes.has(result.getText())) {
-                newCodes.push(result.getText());
-              }
-            } catch (e) {
-              if (!(e instanceof NotFoundException)) {
-                console.error('Barcode scanning error:', e);
-              }
-            }
-          }
-
-          // 新しいコードが見つかった場合の処理
           if (newCodes.length > 0) {
             setScannedCodes(prev => {
               const arr = Array.from(prev);
@@ -269,7 +269,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             newCodes.forEach(code => onScanSuccess(code));
           }
 
-          // ガイド枠の描画
           if (newLocations.length > 0) {
             context.save();
             newLocations.forEach((location: QRCodeLocation) => {
@@ -304,7 +303,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   return (
     <div className="w-full max-w-2xl mx-auto p-6 bg-gray-900 rounded-xl shadow-lg">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-white mb-4">QRコードスキャナー</h2>
+        <h2 className="text-2xl font-bold text-white mb-4">QRコード・バーコードスキャナー</h2>
       </div>
       {isInitializing && (
         <div className="p-4 bg-blue-900 border border-blue-700 rounded-lg text-blue-300 mb-4 flex items-center">
