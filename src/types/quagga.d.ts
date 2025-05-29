@@ -10,6 +10,12 @@ declare module 'quagga' {
         height: { ideal: number };
         frameRate: { ideal: number; min: number };
       };
+      area?: {
+        top: string;
+        right: string;
+        left: string;
+        bottom: string;
+      };
     };
     decoder: {
       readers: string[];
@@ -22,6 +28,11 @@ declare module 'quagga' {
       code: string;
       format: string;
     };
+    line: Array<{ x: number; y: number }>;
+    angle: number;
+    pattern: number[];
+    box: Array<{ x: number; y: number }>;
+    boxes: Array<Array<{ x: number; y: number }>>;
   }
 
   interface QuaggaStatic {
@@ -29,6 +40,18 @@ declare module 'quagga' {
     start(): Promise<void>;
     stop(): void;
     onDetected(callback: (result: QuaggaResult) => void): void;
+    onProcessed(callback: (result: QuaggaResult) => void): void;
+    canvas: {
+      dom: {
+        overlay: HTMLCanvasElement;
+      };
+      ctx: {
+        overlay: CanvasRenderingContext2D;
+      };
+    };
+    ImageDebug: {
+      drawPath(path: Array<{ x: number; y: number }>, options: { x: number | string; y: number | string }, ctx: CanvasRenderingContext2D, options2: { color: string; lineWidth: number }): void;
+    };
   }
 
   const Quagga: QuaggaStatic;

@@ -173,6 +173,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   height: { ideal: 720 },
                   frameRate: { ideal: 30, min: 15 }
                 },
+                area: {
+                  top: "25%",
+                  right: "10%",
+                  left: "10%",
+                  bottom: "25%"
+                }
               },
               decoder: {
                 readers: [
@@ -181,7 +187,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   "code_128_reader",
                   "code_39_reader",
                   "upc_reader",
-                  "upc_e_reader"
+                  "upc_e_reader",
+                  "codabar_reader",
+                  "i2of5_reader"
                 ],
                 multiple: true
               }
@@ -190,15 +198,46 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
             // バーコード検出イベントのリスナー
             Quagga.onDetected((result) => {
-              const code = result.codeResult.code;
-              if (!scannedCodes.has(code)) {
-                setScannedCodes(prev => {
-                  const arr = Array.from(prev);
-                  arr.push(code);
-                  return new Set(arr.slice(-10));
-                });
-                setLastScannedCodes([code]);
-                onScanSuccess(code);
+              if (result.codeResult.code) {
+                const code = result.codeResult.code;
+                if (!scannedCodes.has(code)) {
+                  setScannedCodes(prev => {
+                    const arr = Array.from(prev);
+                    arr.push(code);
+                    return new Set(arr.slice(-10));
+                  });
+                  setLastScannedCodes([code]);
+                  onScanSuccess(code);
+                }
+              }
+            });
+
+            // 処理の進捗を監視
+            Quagga.onProcessed((result) => {
+              const drawingCtx = Quagga.canvas.ctx.overlay;
+              const drawingCanvas = Quagga.canvas.dom.overlay;
+
+              if (result) {
+                if (result.boxes) {
+                  const width = drawingCanvas.getAttribute("width");
+                  const height = drawingCanvas.getAttribute("height");
+                  if (width && height) {
+                    drawingCtx.clearRect(0, 0, parseInt(width), parseInt(height));
+                  }
+                  result.boxes.filter(function (box) {
+                    return box !== result.box;
+                  }).forEach(function (box) {
+                    Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, { color: "green", lineWidth: 2 });
+                  });
+                }
+
+                if (result.box) {
+                  Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, { color: "blue", lineWidth: 2 });
+                }
+
+                if (result.codeResult && result.codeResult.code) {
+                  Quagga.ImageDebug.drawPath(result.line, { x: 'x', y: 'y' }, drawingCtx, { color: "red", lineWidth: 3 });
+                }
               }
             });
 
