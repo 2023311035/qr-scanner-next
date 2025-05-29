@@ -174,10 +174,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   frameRate: { ideal: 30, min: 15 }
                 },
                 area: {
-                  top: "25%",
-                  right: "10%",
-                  left: "10%",
-                  bottom: "25%"
+                  top: "10%",
+                  right: "5%",
+                  left: "5%",
+                  bottom: "10%"
                 }
               },
               decoder: {
@@ -189,7 +189,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   "upc_reader",
                   "upc_e_reader",
                   "codabar_reader",
-                  "i2of5_reader"
+                  "i2of5_reader",
+                  "2of5_reader",
+                  "code_93_reader"
                 ],
                 multiple: true
               }
@@ -200,6 +202,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             Quagga.onDetected((result) => {
               if (result.codeResult.code) {
                 const code = result.codeResult.code;
+                console.log('検出されたコード:', code, 'フォーマット:', result.codeResult.format);
                 if (!scannedCodes.has(code)) {
                   setScannedCodes(prev => {
                     const arr = Array.from(prev);
