@@ -142,7 +142,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             }
           });
           stream.getTracks().forEach(track => track.stop()); // テスト用のストリームを停止
-        } catch (err) {
+        } catch {
           setCameraError('カメラへのアクセスが拒否されました。ブラウザの設定でカメラの使用を許可してください。');
           setIsInitializing(false);
           return;
