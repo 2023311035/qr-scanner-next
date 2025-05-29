@@ -131,6 +131,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           return;
         }
 
+        // 利用可能なカメラデバイスを確認
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(device => device.kind === 'videoinput');
+        console.log('利用可能なカメラデバイス:', videoDevices);
+
+        if (videoDevices.length === 0) {
+          setCameraError('カメラデバイスが見つかりません。');
+          setIsInitializing(false);
+          return;
+        }
+
         // まずカメラのアクセス権限を確認
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -141,8 +152,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               frameRate: { ideal: 60, min: 30 }
             }
           });
+          console.log('カメラストリーム取得成功:', stream.getVideoTracks()[0].getSettings());
           stream.getTracks().forEach(track => track.stop()); // テスト用のストリームを停止
-        } catch {
+        } catch (error) {
+          console.error('カメラアクセスエラー:', error);
           setCameraError('カメラへのアクセスが拒否されました。ブラウザの設定でカメラの使用を許可してください。');
           setIsInitializing(false);
           return;
@@ -150,6 +163,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
         // Quaggaの初期化
         try {
+          console.log('Quagga初期化開始');
           await Quagga.init({
             inputStream: {
               name: "Live",
@@ -174,6 +188,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               multiple: true
             }
           });
+          console.log('Quagga初期化成功');
 
           // バーコード検出イベントのリスナー
           Quagga.onDetected((result) => {
@@ -191,14 +206,15 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
           // Quaggaの開始
           await Quagga.start();
+          console.log('Quagga開始成功');
           setIsInitializing(false);
-        } catch (err) {
-          console.error('Quagga initialization error:', err);
+        } catch (error) {
+          console.error('Quagga初期化エラー:', error);
           setCameraError('カメラの初期化に失敗しました。ブラウザを再読み込みして再度お試しください。');
           setIsInitializing(false);
         }
-      } catch (err) {
-        console.error('Camera initialization error:', err);
+      } catch (error) {
+        console.error('予期せぬエラー:', error);
         setCameraError('予期せぬエラーが発生しました。ブラウザを再読み込みして再度お試しください。');
         setIsInitializing(false);
       }
