@@ -145,7 +145,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         // まず基本的なカメラストリームを取得
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: true
+            video: {
+              facingMode: "environment",
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              frameRate: { ideal: 30, min: 15 }
+            }
           });
 
           if (videoRef.current) {
@@ -163,9 +168,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 type: "LiveStream",
                 target: videoRef.current,
                 constraints: {
-                  width: { ideal: 640 },
-                  height: { ideal: 480 },
                   facingMode: "environment",
+                  width: { ideal: 1280 },
+                  height: { ideal: 720 },
                   frameRate: { ideal: 30, min: 15 }
                 },
               },
@@ -208,8 +213,28 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           }
         } catch (error) {
           console.error('カメラアクセスエラー:', error);
-          setCameraError('カメラへのアクセスが拒否されました。ブラウザの設定でカメラの使用を許可してください。');
-          setIsInitializing(false);
+          // 外カメラが使用できない場合は内カメラを試す
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: {
+                facingMode: "user",
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 30 }
+              }
+            });
+
+            if (videoRef.current) {
+              videoRef.current.srcObject = stream;
+              await videoRef.current.play();
+              console.log('内カメラストリーム取得成功:', stream.getVideoTracks()[0].getSettings());
+            }
+            setIsInitializing(false);
+          } catch (innerError) {
+            console.error('内カメラアクセスエラー:', innerError);
+            setCameraError('カメラへのアクセスが拒否されました。ブラウザの設定でカメラの使用を許可してください。');
+            setIsInitializing(false);
+          }
         }
       } catch (error) {
         console.error('予期せぬエラー:', error);
