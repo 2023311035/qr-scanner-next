@@ -131,51 +131,75 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           return;
         }
 
-        // Quaggaの初期化
-        await Quagga.init({
-          inputStream: {
-            name: "Live",
-            type: "LiveStream",
-            target: videoRef.current,
-            constraints: {
+        // まずカメラのアクセス権限を確認
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: {
               facingMode: "environment",
               width: { ideal: 1280 },
               height: { ideal: 720 },
               frameRate: { ideal: 60, min: 30 }
+            }
+          });
+          stream.getTracks().forEach(track => track.stop()); // テスト用のストリームを停止
+        } catch (err) {
+          setCameraError('カメラへのアクセスが拒否されました。ブラウザの設定でカメラの使用を許可してください。');
+          setIsInitializing(false);
+          return;
+        }
+
+        // Quaggaの初期化
+        try {
+          await Quagga.init({
+            inputStream: {
+              name: "Live",
+              type: "LiveStream",
+              target: videoRef.current,
+              constraints: {
+                facingMode: "environment",
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                frameRate: { ideal: 60, min: 30 }
+              },
             },
-          },
-          decoder: {
-            readers: [
-              "ean_reader",
-              "ean_8_reader",
-              "code_128_reader",
-              "code_39_reader",
-              "upc_reader",
-              "upc_e_reader"
-            ],
-            multiple: true
-          }
-        });
+            decoder: {
+              readers: [
+                "ean_reader",
+                "ean_8_reader",
+                "code_128_reader",
+                "code_39_reader",
+                "upc_reader",
+                "upc_e_reader"
+              ],
+              multiple: true
+            }
+          });
 
-        // バーコード検出イベントのリスナー
-        Quagga.onDetected((result) => {
-          const code = result.codeResult.code;
-          if (!scannedCodes.has(code)) {
-            setScannedCodes(prev => {
-              const arr = Array.from(prev);
-              arr.push(code);
-              return new Set(arr.slice(-10));
-            });
-            setLastScannedCodes([code]);
-            onScanSuccess(code);
-          }
-        });
+          // バーコード検出イベントのリスナー
+          Quagga.onDetected((result) => {
+            const code = result.codeResult.code;
+            if (!scannedCodes.has(code)) {
+              setScannedCodes(prev => {
+                const arr = Array.from(prev);
+                arr.push(code);
+                return new Set(arr.slice(-10));
+              });
+              setLastScannedCodes([code]);
+              onScanSuccess(code);
+            }
+          });
 
-        // Quaggaの開始
-        await Quagga.start();
-        setIsInitializing(false);
-      } catch {
-        setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
+          // Quaggaの開始
+          await Quagga.start();
+          setIsInitializing(false);
+        } catch (err) {
+          console.error('Quagga initialization error:', err);
+          setCameraError('カメラの初期化に失敗しました。ブラウザを再読み込みして再度お試しください。');
+          setIsInitializing(false);
+        }
+      } catch (err) {
+        console.error('Camera initialization error:', err);
+        setCameraError('予期せぬエラーが発生しました。ブラウザを再読み込みして再度お試しください。');
         setIsInitializing(false);
       }
     };
