@@ -27,7 +27,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const zbarScannerRef = useRef<{ scanImageData: (imageData: ImageData) => Promise<ZBarResult[]> } | null>(null);
 
   useEffect(() => {
@@ -175,7 +174,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         // Quaggaの開始
         await Quagga.start();
         setIsInitializing(false);
-      } catch (error) {
+      } catch {
         setCameraError('カメラの起動に失敗しました。ブラウザの許可設定を確認してください。');
         setIsInitializing(false);
       }
