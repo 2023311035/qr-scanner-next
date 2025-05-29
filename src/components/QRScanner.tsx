@@ -142,75 +142,73 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           return;
         }
 
-        // まずカメラのアクセス権限を確認
+        // まず基本的なカメラストリームを取得
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: "environment",
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              frameRate: { ideal: 60, min: 30 }
-            }
+            video: true
           });
-          console.log('カメラストリーム取得成功:', stream.getVideoTracks()[0].getSettings());
-          stream.getTracks().forEach(track => track.stop()); // テスト用のストリームを停止
+
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            await videoRef.current.play();
+            console.log('カメラストリーム取得成功:', stream.getVideoTracks()[0].getSettings());
+          }
+
+          // Quaggaの初期化
+          try {
+            console.log('Quagga初期化開始');
+            await Quagga.init({
+              inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: videoRef.current,
+                constraints: {
+                  width: { ideal: 640 },
+                  height: { ideal: 480 },
+                  facingMode: "environment",
+                  frameRate: { ideal: 30, min: 15 }
+                },
+              },
+              decoder: {
+                readers: [
+                  "ean_reader",
+                  "ean_8_reader",
+                  "code_128_reader",
+                  "code_39_reader",
+                  "upc_reader",
+                  "upc_e_reader"
+                ],
+                multiple: true
+              }
+            });
+            console.log('Quagga初期化成功');
+
+            // バーコード検出イベントのリスナー
+            Quagga.onDetected((result) => {
+              const code = result.codeResult.code;
+              if (!scannedCodes.has(code)) {
+                setScannedCodes(prev => {
+                  const arr = Array.from(prev);
+                  arr.push(code);
+                  return new Set(arr.slice(-10));
+                });
+                setLastScannedCodes([code]);
+                onScanSuccess(code);
+              }
+            });
+
+            // Quaggaの開始
+            await Quagga.start();
+            console.log('Quagga開始成功');
+            setIsInitializing(false);
+          } catch (error) {
+            console.error('Quagga初期化エラー:', error);
+            // Quaggaの初期化に失敗しても、カメラストリームは維持
+            setIsInitializing(false);
+          }
         } catch (error) {
           console.error('カメラアクセスエラー:', error);
           setCameraError('カメラへのアクセスが拒否されました。ブラウザの設定でカメラの使用を許可してください。');
-          setIsInitializing(false);
-          return;
-        }
-
-        // Quaggaの初期化
-        try {
-          console.log('Quagga初期化開始');
-          await Quagga.init({
-            inputStream: {
-              name: "Live",
-              type: "LiveStream",
-              target: videoRef.current,
-              constraints: {
-                facingMode: "environment",
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
-                frameRate: { ideal: 60, min: 30 }
-              },
-            },
-            decoder: {
-              readers: [
-                "ean_reader",
-                "ean_8_reader",
-                "code_128_reader",
-                "code_39_reader",
-                "upc_reader",
-                "upc_e_reader"
-              ],
-              multiple: true
-            }
-          });
-          console.log('Quagga初期化成功');
-
-          // バーコード検出イベントのリスナー
-          Quagga.onDetected((result) => {
-            const code = result.codeResult.code;
-            if (!scannedCodes.has(code)) {
-              setScannedCodes(prev => {
-                const arr = Array.from(prev);
-                arr.push(code);
-                return new Set(arr.slice(-10));
-              });
-              setLastScannedCodes([code]);
-              onScanSuccess(code);
-            }
-          });
-
-          // Quaggaの開始
-          await Quagga.start();
-          console.log('Quagga開始成功');
-          setIsInitializing(false);
-        } catch (error) {
-          console.error('Quagga初期化エラー:', error);
-          setCameraError('カメラの初期化に失敗しました。ブラウザを再読み込みして再度お試しください。');
           setIsInitializing(false);
         }
       } catch (error) {
@@ -224,6 +222,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
     return () => {
       Quagga.stop();
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+      }
     };
   }, [scannedCodes, onScanSuccess]);
 
