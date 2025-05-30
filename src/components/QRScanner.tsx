@@ -257,7 +257,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           <div className="p-4 bg-gray-800 border border-green-700 rounded-lg shadow-sm">
             <h3 className="text-lg font-semibold mb-2 text-green-400">最新のスキャン結果:</h3>
             <ul className="space-y-1">
-              {lastScannedCodes.map((code, idx) => (
+              {[...lastScannedCodes].reverse().map((code, idx) => (
                 <li key={idx}>
                   {isValidUrl(code) ? (
                     <a 
@@ -287,7 +287,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             </button>
           </div>
           <ul className="space-y-2 max-h-[440px] overflow-y-auto pr-2">
-            {Array.from(scannedCodes).map((code, index) => (
+            {Array.from(scannedCodes).reverse().map((code, index) => (
               <li key={index} className="p-3 bg-gray-700 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200">
                 {isValidUrl(code) ? (
                   <a 
