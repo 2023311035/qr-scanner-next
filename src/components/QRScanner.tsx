@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { BrowserMultiFormatReader, BarcodeFormat, Result } from '@zxing/library';
+import { BrowserQRCodeReader } from '@zxing/browser';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -14,7 +14,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const codeReaderRef = useRef<BrowserQRCodeReader | null>(null);
 
   useEffect(() => {
     let video: HTMLVideoElement | null = null;
@@ -43,21 +43,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         // ZXingの初期化
         try {
           console.log('ZXing初期化開始');
-          const codeReader = new BrowserMultiFormatReader();
+          const codeReader = new BrowserQRCodeReader();
           codeReaderRef.current = codeReader;
-
-          // バーコードフォーマットの設定
-          const formats = [
-            BarcodeFormat.EAN_13,
-            BarcodeFormat.EAN_8,
-            BarcodeFormat.UPC_A,
-            BarcodeFormat.UPC_E,
-            BarcodeFormat.CODE_39,
-            BarcodeFormat.CODE_128,
-            BarcodeFormat.ITF,
-            BarcodeFormat.CODABAR,
-            BarcodeFormat.QR_CODE
-          ];
 
           // カメラストリームの取得
           const stream = await navigator.mediaDevices.getUserMedia({
@@ -65,7 +52,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               facingMode: "environment",
               width: { ideal: 1280 },
               height: { ideal: 720 },
-              frameRate: { ideal: 60, min: 30 }
+              frameRate: { ideal: 30 }
             }
           });
 
@@ -73,37 +60,34 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             video = videoRef.current;
             video.srcObject = stream;
             await video.play();
-            console.log('カメラストリーム取得成功:', stream.getVideoTracks()[0].getSettings());
+            const settings = stream.getVideoTracks()[0].getSettings();
+            console.log('カメラストリーム取得成功:', {
+              width: settings.width,
+              height: settings.height,
+              frameRate: settings.frameRate,
+              deviceId: settings.deviceId
+            });
           }
 
           // バーコードスキャンの開始
           const scanCode = async () => {
             if (video && codeReaderRef.current) {
               try {
-                // 複数検出用の設定
-                codeReaderRef.current.hints.set(2, formats); // 2 = DecodeHintType.POSSIBLE_FORMATS
-                codeReaderRef.current.hints.set(3, true); // 3 = DecodeHintType.TRY_HARDER
-                codeReaderRef.current.hints.set(4, true); // 4 = DecodeHintType.MULTIPLE
-                codeReaderRef.current.hints.set(5, true); // 5 = DecodeHintType.PURE_BARCODE
-                codeReaderRef.current.hints.set(6, true); // 6 = DecodeHintType.ASSUME_GS1
-                codeReaderRef.current.hints.set(7, true); // 7 = DecodeHintType.RETURN_COORDINATES
-
-                // デバッグ用のログを追加
-                console.log('ZXing設定:', {
-                  formats: formats,
-                  hints: codeReaderRef.current.hints
-                });
-
+                console.log('スキャン開始...');
                 await codeReaderRef.current.decodeFromVideoDevice(
-                  null,
+                  undefined,
                   video,
-                  (result: Result | null) => {
+                  (result, error) => {
+                    if (error) {
+                      console.error('スキャンエラー:', error);
+                      return;
+                    }
                     if (result) {
                       const code = result.getText();
                       console.log('検出されたコード:', {
                         text: code,
-                        format: result.getBarcodeFormat(),
-                        timestamp: new Date().toISOString()
+                        timestamp: new Date().toISOString(),
+                        format: result.getBarcodeFormat()
                       });
                       if (!scannedCodes.has(code)) {
                         setScannedCodes(prev => {
@@ -113,7 +97,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                         });
                         setLastScannedCodes(prev => {
                           const newCodes = [...prev, code];
-                          return newCodes.slice(-5); // 最新の5件を保持
+                          return newCodes.slice(-5);
                         });
                         onScanSuccess(code);
                       }
@@ -144,9 +128,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     initializeCamera();
 
     return () => {
-      if (codeReaderRef.current) {
-        codeReaderRef.current.reset();
-      }
       if (video && video.srcObject) {
         const stream = video.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
@@ -176,7 +157,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               await new Promise((resolve) => {
                 img.onload = resolve;
               });
-              const result = await codeReaderRef.current.decodeFromImage(img);
+              const result = await codeReaderRef.current.decodeFromImageUrl(img.src);
               if (result) {
                 const code = result.getText();
                 if (!scannedCodes.has(code)) {
