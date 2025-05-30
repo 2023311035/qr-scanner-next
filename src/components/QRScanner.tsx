@@ -174,10 +174,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   frameRate: { ideal: 60, min: 30 }
                 },
                 area: {
-                  top: "0%",
-                  right: "0%",
-                  left: "0%",
-                  bottom: "0%"
+                  top: "25%",
+                  right: "25%",
+                  left: "25%",
+                  bottom: "25%"
                 }
               },
               decoder: {
