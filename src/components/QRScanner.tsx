@@ -7,6 +7,11 @@ interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
 }
 
+interface LastScannedCode {
+  code: string;
+  timestamp: number;
+}
+
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
   const [cameraError, setCameraError] = useState<string>('');
@@ -15,6 +20,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserQRCodeReader | null>(null);
+  const lastScannedRef = useRef<LastScannedCode | null>(null);
+  const COOLDOWN_PERIOD = 3000; // 3秒間のクールダウン期間
 
   useEffect(() => {
     let video: HTMLVideoElement | null = null;
@@ -84,11 +91,28 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     }
                     if (result) {
                       const code = result.getText();
+                      const now = Date.now();
+                      
+                      // クールダウン期間内の同じコードの再検出を防ぐ
+                      if (lastScannedRef.current && 
+                          lastScannedRef.current.code === code && 
+                          now - lastScannedRef.current.timestamp < COOLDOWN_PERIOD) {
+                        console.log('クールダウン期間中のため、同じコードを無視:', code);
+                        return;
+                      }
+
                       console.log('検出されたコード:', {
                         text: code,
                         timestamp: new Date().toISOString(),
                         format: result.getBarcodeFormat()
                       });
+
+                      // 最後に検出したコードを記録
+                      lastScannedRef.current = {
+                        code,
+                        timestamp: now
+                      };
+
                       if (!scannedCodes.has(code)) {
                         setScannedCodes(prev => {
                           const arr = Array.from(prev);
