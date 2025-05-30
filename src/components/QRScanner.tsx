@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { BrowserQRCodeReader } from '@zxing/browser';
+import { BrowserMultiFormatReader } from '@zxing/browser';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -14,7 +14,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const codeReaderRef = useRef<BrowserQRCodeReader | null>(null);
+  const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const sessionScannedCodesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
@@ -46,7 +46,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         // ZXingの初期化
         try {
           console.log('ZXing初期化開始');
-          const codeReader = new BrowserQRCodeReader();
+          const codeReader = new BrowserMultiFormatReader();
           codeReaderRef.current = codeReader;
 
           // カメラストリームの取得
@@ -95,7 +95,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                       }
 
                       // 新しいコードの場合のみ処理を実行
-                      console.log('新しいコードを検出:', code);
+                      console.log('新しいコードを検出:', {
+                        text: code,
+                        format: result.getBarcodeFormat()
+                      });
                       sessionScannedCodesRef.current.add(code);
 
                       // 履歴に追加
