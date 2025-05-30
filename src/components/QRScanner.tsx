@@ -87,22 +87,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     }
                     if (result) {
                       const code = result.getText();
-                      
                       // セッション中に既にスキャン済みのコードは無視
                       if (sessionScannedCodesRef.current.has(code)) {
                         console.log('セッション中に既にスキャン済みのコードを無視:', code);
                         return;
                       }
-
+                      sessionScannedCodesRef.current.add(code);
                       console.log('検出されたコード:', {
                         text: code,
                         timestamp: new Date().toISOString(),
                         format: result.getBarcodeFormat()
                       });
-
-                      // セッション中のスキャン済みコードとして記録
-                      sessionScannedCodesRef.current.add(code);
-
                       // 履歴に追加
                       setScannedCodes(prev => {
                         const arr = Array.from(prev);
@@ -146,7 +141,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [scannedCodes, onScanSuccess]);
+  }, [onScanSuccess]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
