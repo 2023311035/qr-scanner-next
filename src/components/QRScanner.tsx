@@ -87,27 +87,30 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     }
                     if (result) {
                       const code = result.getText();
-                      // セッション中に既にスキャン済みのコードは無視
+                      
+                      // 重複チェックを厳密に行う
                       if (sessionScannedCodesRef.current.has(code)) {
-                        console.log('セッション中に既にスキャン済みのコードを無視:', code);
+                        console.log('重複コードを検出 - 無視します:', code);
                         return;
                       }
+
+                      // 新しいコードの場合のみ処理を実行
+                      console.log('新しいコードを検出:', code);
                       sessionScannedCodesRef.current.add(code);
-                      console.log('検出されたコード:', {
-                        text: code,
-                        timestamp: new Date().toISOString(),
-                        format: result.getBarcodeFormat()
-                      });
+
                       // 履歴に追加
                       setScannedCodes(prev => {
-                        const arr = Array.from(prev);
-                        arr.push(code);
-                        return new Set(arr.slice(-10));
+                        const newSet = new Set(prev);
+                        newSet.add(code);
+                        return new Set(Array.from(newSet).slice(-10));
                       });
+
                       setLastScannedCodes(prev => {
                         const newCodes = [...prev, code];
                         return newCodes.slice(-5);
                       });
+
+                      // コールバックを呼び出し
                       onScanSuccess(code);
                     }
                   }
@@ -141,7 +144,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [onScanSuccess]);
+  }, []);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
