@@ -24,6 +24,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
 
   useEffect(() => {
+    let video: HTMLVideoElement | null = null;
     const initializeCamera = async () => {
       try {
         setIsInitializing(true);
@@ -76,14 +77,15 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           });
 
           if (videoRef.current) {
-            videoRef.current.srcObject = stream;
-            await videoRef.current.play();
+            video = videoRef.current;
+            video.srcObject = stream;
+            await video.play();
             console.log('カメラストリーム取得成功:', stream.getVideoTracks()[0].getSettings());
           }
 
           // バーコードスキャンの開始
           const scanCode = async () => {
-            if (videoRef.current && codeReaderRef.current) {
+            if (video && codeReaderRef.current) {
               try {
                 // 複数検出用の設定
                 codeReaderRef.current.hints.set(2, formats); // 2 = DecodeHintType.POSSIBLE_FORMATS
@@ -92,7 +94,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
                 await codeReaderRef.current.decodeFromVideoDevice(
                   null,
-                  videoRef.current,
+                  video,
                   (result: Result | null) => {
                     if (result) {
                       const code = result.getText();
@@ -136,7 +138,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     initializeCamera();
 
     return () => {
-      const video = videoRef.current;
       if (codeReaderRef.current) {
         codeReaderRef.current.reset();
       }
