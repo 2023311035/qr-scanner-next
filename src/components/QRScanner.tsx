@@ -7,13 +7,6 @@ interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
 }
 
-interface QRCodeLocation {
-  topLeftCorner: { x: number; y: number };
-  topRightCorner: { x: number; y: number };
-  bottomRightCorner: { x: number; y: number };
-  bottomLeftCorner: { x: number; y: number };
-}
-
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
   const [cameraError, setCameraError] = useState<string>('');
