@@ -60,17 +60,6 @@ declare module 'quagga' {
     };
   }
 
-  interface DecoderConfig {
-    readers: string[];
-    multiple: boolean;
-    debug?: {
-      drawBoundingBox?: boolean;
-      showFrequency?: boolean;
-      drawScanline?: boolean;
-      showPattern?: boolean;
-    };
-  }
-
   const Quagga: QuaggaStatic;
   export default Quagga;
 } 
