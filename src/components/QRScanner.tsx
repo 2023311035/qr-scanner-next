@@ -84,6 +84,15 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 codeReaderRef.current.hints.set(2, formats); // 2 = DecodeHintType.POSSIBLE_FORMATS
                 codeReaderRef.current.hints.set(3, true); // 3 = DecodeHintType.TRY_HARDER
                 codeReaderRef.current.hints.set(4, true); // 4 = DecodeHintType.MULTIPLE
+                codeReaderRef.current.hints.set(5, true); // 5 = DecodeHintType.PURE_BARCODE
+                codeReaderRef.current.hints.set(6, true); // 6 = DecodeHintType.ASSUME_GS1
+                codeReaderRef.current.hints.set(7, true); // 7 = DecodeHintType.RETURN_COORDINATES
+
+                // デバッグ用のログを追加
+                console.log('ZXing設定:', {
+                  formats: formats,
+                  hints: codeReaderRef.current.hints
+                });
 
                 await codeReaderRef.current.decodeFromVideoDevice(
                   null,
@@ -91,7 +100,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   (result: Result | null) => {
                     if (result) {
                       const code = result.getText();
-                      console.log('検出されたコード:', code, 'フォーマット:', result.getBarcodeFormat());
+                      console.log('検出されたコード:', {
+                        text: code,
+                        format: result.getBarcodeFormat(),
+                        timestamp: new Date().toISOString()
+                      });
                       if (!scannedCodes.has(code)) {
                         setScannedCodes(prev => {
                           const arr = Array.from(prev);
