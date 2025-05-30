@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader, BarcodeFormat, Result } from '@zxing/library';
-import { BrowserQRCodeReader } from '@zxing/browser';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -13,11 +12,6 @@ interface QRCodeLocation {
   topRightCorner: { x: number; y: number };
   bottomRightCorner: { x: number; y: number };
   bottomLeftCorner: { x: number; y: number };
-}
-
-interface ZBarResult {
-  data: string;
-  location?: QRCodeLocation;
 }
 
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
@@ -96,7 +90,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 codeReaderRef.current.hints.set(3, true); // 3 = DecodeHintType.TRY_HARDER
                 codeReaderRef.current.hints.set(4, true); // 4 = DecodeHintType.MULTIPLE
 
-                const result = await codeReaderRef.current.decodeFromVideoDevice(
+                await codeReaderRef.current.decodeFromVideoDevice(
                   null,
                   videoRef.current,
                   (result: Result | null) => {
@@ -142,11 +136,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     initializeCamera();
 
     return () => {
+      const video = videoRef.current;
       if (codeReaderRef.current) {
         codeReaderRef.current.reset();
       }
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
+      if (video && video.srcObject) {
+        const stream = video.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
     };
@@ -167,7 +162,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             canvas.width = img.width;
             canvas.height = img.height;
             context.drawImage(img, 0, 0);
-            const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
             
             try {
               const img = new Image();
