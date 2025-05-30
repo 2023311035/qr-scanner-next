@@ -27,6 +27,15 @@ declare module 'quagga' {
         showPattern?: boolean;
       };
     };
+    locate?: boolean;
+    frequency?: number;
+    numOfWorkers?: number;
+    debug?: {
+      drawBoundingBox?: boolean;
+      showFrequency?: boolean;
+      drawScanline?: boolean;
+      showPattern?: boolean;
+    };
   }
 
   interface QuaggaResult {
@@ -50,6 +59,7 @@ declare module 'quagga' {
     canvas: {
       dom: {
         overlay: HTMLCanvasElement;
+        image: HTMLCanvasElement;
       };
       ctx: {
         overlay: CanvasRenderingContext2D;

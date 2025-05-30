@@ -174,10 +174,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   frameRate: { ideal: 60, min: 30 }
                 },
                 area: {
-                  top: "5%",
+                  top: "0%",
                   right: "0%",
                   left: "0%",
-                  bottom: "5%"
+                  bottom: "0%"
                 }
               },
               decoder: {
@@ -193,13 +193,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   "2of5_reader",
                   "code_93_reader"
                 ],
-                multiple: true,
-                debug: {
-                  drawBoundingBox: true,
-                  showFrequency: true,
-                  drawScanline: true,
-                  showPattern: true
-                }
+                multiple: true
               }
             });
             console.log('Quagga初期化成功');
@@ -210,6 +204,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 const code = result.codeResult.code;
                 console.log('検出されたコード:', code, 'フォーマット:', result.codeResult.format);
                 console.log('検出位置:', result.box);
+                console.log('角度:', result.angle);
                 if (!scannedCodes.has(code)) {
                   setScannedCodes(prev => {
                     const arr = Array.from(prev);
@@ -254,6 +249,22 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             // Quaggaの開始
             await Quagga.start();
             console.log('Quagga開始成功');
+
+            // デバッグ用：定期的にスキャン状態を確認
+            setInterval(() => {
+              const canvas = Quagga.canvas.dom.image;
+              if (canvas) {
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                  console.log('スキャン中...', {
+                    width: canvas.width,
+                    height: canvas.height,
+                    dataLength: imageData.data.length
+                  });
+                }
+              }
+            }, 1000);
             setIsInitializing(false);
           } catch (error) {
             console.error('Quagga初期化エラー:', error);
