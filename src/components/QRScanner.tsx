@@ -103,18 +103,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                       // セッション中のスキャン済みコードとして記録
                       sessionScannedCodesRef.current.add(code);
 
-                      if (!scannedCodes.has(code)) {
-                        setScannedCodes(prev => {
-                          const arr = Array.from(prev);
-                          arr.push(code);
-                          return new Set(arr.slice(-10));
-                        });
-                        setLastScannedCodes(prev => {
-                          const newCodes = [...prev, code];
-                          return newCodes.slice(-5);
-                        });
-                        onScanSuccess(code);
-                      }
+                      // 履歴に追加
+                      setScannedCodes(prev => {
+                        const arr = Array.from(prev);
+                        arr.push(code);
+                        return new Set(arr.slice(-10));
+                      });
+                      setLastScannedCodes(prev => {
+                        const newCodes = [...prev, code];
+                        return newCodes.slice(-5);
+                      });
+                      onScanSuccess(code);
                     }
                   }
                 );
