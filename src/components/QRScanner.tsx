@@ -7,11 +7,6 @@ interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
 }
 
-interface LastScannedCode {
-  code: string;
-  timestamp: number;
-}
-
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
   const [cameraError, setCameraError] = useState<string>('');
@@ -21,7 +16,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserQRCodeReader | null>(null);
   const sessionScannedCodesRef = useRef<Set<string>>(new Set());
-  const COOLDOWN_PERIOD = 3000; // 3秒間のクールダウン期間
 
   useEffect(() => {
     let video: HTMLVideoElement | null = null;
