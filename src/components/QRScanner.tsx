@@ -149,7 +149,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               facingMode: "environment",
               width: { ideal: 1280 },
               height: { ideal: 720 },
-              frameRate: { ideal: 30, min: 15 }
+              frameRate: { ideal: 60, min: 30 }
             }
           });
 
@@ -171,7 +171,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   facingMode: "environment",
                   width: { ideal: 1280 },
                   height: { ideal: 720 },
-                  frameRate: { ideal: 30, min: 15 }
+                  frameRate: { ideal: 60, min: 30 }
                 },
                 area: {
                   top: "10%",
