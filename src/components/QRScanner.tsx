@@ -174,10 +174,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   frameRate: { ideal: 60, min: 30 }
                 },
                 area: {
-                  top: "10%",
-                  right: "5%",
-                  left: "5%",
-                  bottom: "10%"
+                  top: "5%",
+                  right: "0%",
+                  left: "0%",
+                  bottom: "5%"
                 }
               },
               decoder: {
@@ -193,7 +193,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   "2of5_reader",
                   "code_93_reader"
                 ],
-                multiple: true
+                multiple: true,
+                debug: {
+                  drawBoundingBox: true,
+                  showFrequency: true,
+                  drawScanline: true,
+                  showPattern: true
+                }
               }
             });
             console.log('Quagga初期化成功');
@@ -203,6 +209,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               if (result.codeResult.code) {
                 const code = result.codeResult.code;
                 console.log('検出されたコード:', code, 'フォーマット:', result.codeResult.format);
+                console.log('検出位置:', result.box);
                 if (!scannedCodes.has(code)) {
                   setScannedCodes(prev => {
                     const arr = Array.from(prev);

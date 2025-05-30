@@ -20,6 +20,12 @@ declare module 'quagga' {
     decoder: {
       readers: string[];
       multiple: boolean;
+      debug?: {
+        drawBoundingBox?: boolean;
+        showFrequency?: boolean;
+        drawScanline?: boolean;
+        showPattern?: boolean;
+      };
     };
   }
 
@@ -51,6 +57,17 @@ declare module 'quagga' {
     };
     ImageDebug: {
       drawPath(path: Array<{ x: number; y: number }>, options: { x: number | string; y: number | string }, ctx: CanvasRenderingContext2D, options2: { color: string; lineWidth: number }): void;
+    };
+  }
+
+  interface DecoderConfig {
+    readers: string[];
+    multiple: boolean;
+    debug?: {
+      drawBoundingBox?: boolean;
+      showFrequency?: boolean;
+      drawScanline?: boolean;
+      showPattern?: boolean;
     };
   }
 
