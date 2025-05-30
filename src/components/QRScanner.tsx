@@ -20,7 +20,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserQRCodeReader | null>(null);
-  const lastScannedRef = useRef<LastScannedCode | null>(null);
+  const sessionScannedCodesRef = useRef<Set<string>>(new Set());
   const COOLDOWN_PERIOD = 3000; // 3秒間のクールダウン期間
 
   useEffect(() => {
@@ -29,6 +29,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       try {
         setIsInitializing(true);
         setCameraError('');
+        // セッション開始時にスキャン済みコードをリセット
+        sessionScannedCodesRef.current = new Set();
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
@@ -91,13 +93,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     }
                     if (result) {
                       const code = result.getText();
-                      const now = Date.now();
                       
-                      // クールダウン期間内の同じコードの再検出を防ぐ
-                      if (lastScannedRef.current && 
-                          lastScannedRef.current.code === code && 
-                          now - lastScannedRef.current.timestamp < COOLDOWN_PERIOD) {
-                        console.log('クールダウン期間中のため、同じコードを無視:', code);
+                      // セッション中に既にスキャン済みのコードは無視
+                      if (sessionScannedCodesRef.current.has(code)) {
+                        console.log('セッション中に既にスキャン済みのコードを無視:', code);
                         return;
                       }
 
@@ -107,11 +106,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                         format: result.getBarcodeFormat()
                       });
 
-                      // 最後に検出したコードを記録
-                      lastScannedRef.current = {
-                        code,
-                        timestamp: now
-                      };
+                      // セッション中のスキャン済みコードとして記録
+                      sessionScannedCodesRef.current.add(code);
 
                       if (!scannedCodes.has(code)) {
                         setScannedCodes(prev => {
