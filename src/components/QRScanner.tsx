@@ -23,7 +23,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       try {
         setIsInitializing(true);
         setCameraError('');
-        // セッション開始時にスキャン済みコードをリセット
         sessionScannedCodesRef.current = new Set();
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -49,13 +48,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const codeReader = new BrowserMultiFormatReader();
           codeReaderRef.current = codeReader;
 
-          // カメラストリームの取得
+          // カメラストリームの取得（高解像度設定）
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-              frameRate: { ideal: 30 }
+              width: { ideal: 1920 },  // 解像度を上げる
+              height: { ideal: 1080 }, // 解像度を上げる
+              frameRate: { ideal: 60 } // フレームレートを上げる
             }
           });
 
@@ -77,6 +76,22 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             if (video && codeReaderRef.current) {
               try {
                 console.log('スキャン開始...');
+                // ZXingの検出精度を向上させる設定
+                const hints = new Map();
+                hints.set('TRY_HARDER', true);
+                hints.set('POSSIBLE_FORMATS', [
+                  'QR_CODE',
+                  'EAN_13',
+                  'EAN_8',
+                  'UPC_A',
+                  'UPC_E',
+                  'CODE_39',
+                  'CODE_128',
+                  'ITF',
+                  'CODABAR'
+                ]);
+                codeReaderRef.current.hints = hints;
+
                 await codeReaderRef.current.decodeFromVideoDevice(
                   undefined,
                   video,
