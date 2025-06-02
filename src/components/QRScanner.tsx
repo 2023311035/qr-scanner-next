@@ -237,8 +237,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 try {
                   result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
                   if (result) break;
-                } catch (error) {
-                  console.log(`試行 ${attempts + 1} 回目: 検出失敗`);
+                } catch (err) {
+                  console.log(`試行 ${attempts + 1} 回目: 検出失敗`, err);
                 }
                 attempts++;
               }
