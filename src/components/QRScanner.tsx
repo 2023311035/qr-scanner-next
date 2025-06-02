@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import jsQR from 'jsqr';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -264,32 +265,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               
               context.putImageData(imageData, 0, 0);
 
-              // ZXingの検出精度を向上させる設定
-              const hints = new Map();
-              hints.set('TRY_HARDER', true);
-              hints.set('POSSIBLE_FORMATS', [
-                'QR_CODE',
-                'DATA_MATRIX',
-                'AZTEC',
-                'PDF_417',
-                'MAXICODE',
-                'UPC_A',
-                'UPC_E',
-                'EAN_8',
-                'EAN_13',
-                'CODE_39',
-                'CODE_93',
-                'CODE_128',
-                'ITF',
-                'CODABAR'
-              ]);
-              hints.set('CHARACTER_SET', 'UTF-8');
-              hints.set('PURE_BARCODE', false);
-              hints.set('NEED_RESULT_POINT_CALLBACK', true);
-              hints.set('ASSUME_GS1', false);
-              hints.set('RETURN_CODABAR_START_END', false);
-              codeReaderRef.current.hints = hints;
-
               // 画像の品質を保持したままDataURLを生成（PNG形式で高品質）
               const dataUrl = canvas.toDataURL('image/png', 1.0);
               console.log('画像処理完了:', {
@@ -298,21 +273,20 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 format: 'PNG',
                 quality: 1.0,
                 originalWidth: img.width,
-                originalHeight: img.height,
-                contrastFactor: factor
+                originalHeight: img.height
               });
               
               // コードを検出（複数回試行）
               let result = null;
               let attempts = 0;
-              const maxAttempts = 10;
+              const maxAttempts = 5;
 
               while (!result && attempts < maxAttempts) {
                 try {
                   console.log(`試行 ${attempts + 1} 回目: コード検出中...`);
                   
-                  // 画像の回転を試行
-                  if (attempts > 0 && attempts <= 4) {
+                  // 画像の回転を試行（90度ずつ）
+                  if (attempts > 0) {
                     context.save();
                     context.translate(canvas.width / 2, canvas.height / 2);
                     context.rotate((Math.PI / 2) * attempts);
@@ -320,27 +294,45 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     context.restore();
                   }
 
-                  // 画像のスケールを試行（QRコード用）
-                  if (attempts > 4) {
-                    const scale = attempts === 5 ? 1.2 : attempts === 6 ? 0.8 : attempts === 7 ? 1.5 : 0.7;
-                    context.save();
-                    context.translate(canvas.width / 2, canvas.height / 2);
-                    context.scale(scale, scale);
-                    context.drawImage(img, -width / 2, -height / 2, width, height);
-                    context.restore();
+                  // ZXingでの検出を試みる
+                  try {
+                    result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
+                    if (result) {
+                      console.log('ZXingでコード検出成功:', {
+                        text: result.getText(),
+                        format: result.getBarcodeFormat(),
+                        timestamp: new Date().toISOString(),
+                        attempt: attempts + 1
+                      });
+                      break;
+                    }
+                  } catch (zxingError) {
+                    console.log('ZXingでの検出失敗:', zxingError);
                   }
 
-                  result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
-                  if (result) {
-                    console.log('コード検出成功:', {
-                      text: result.getText(),
-                      format: result.getBarcodeFormat(),
-                      timestamp: new Date().toISOString(),
-                      attempt: attempts + 1,
-                      scale: attempts > 4 ? (attempts === 5 ? 1.2 : attempts === 6 ? 0.8 : attempts === 7 ? 1.5 : 0.7) : 1
+                  // jsQRでの検出を試みる
+                  try {
+                    const imageData = context.getImageData(0, 0, width, height);
+                    const jsQRResult = jsQR(imageData.data, width, height, {
+                      inversionAttempts: "dontInvert",
                     });
-                    break;
+
+                    if (jsQRResult) {
+                      console.log('jsQRでコード検出成功:', {
+                        text: jsQRResult.data,
+                        timestamp: new Date().toISOString(),
+                        attempt: attempts + 1
+                      });
+                      result = {
+                        getText: () => jsQRResult.data,
+                        getBarcodeFormat: () => 'QR_CODE'
+                      };
+                      break;
+                    }
+                  } catch (jsQRError) {
+                    console.log('jsQRでの検出失敗:', jsQRError);
                   }
+
                 } catch (err) {
                   console.log(`試行 ${attempts + 1} 回目: 検出失敗`, err);
                 }
