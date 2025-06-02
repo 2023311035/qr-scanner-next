@@ -249,23 +249,31 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.drawImage(img, 0, 0, width, height);
 
             try {
-              // 画像の前処理
+              // 画像の前処理を強化
               const imageData = context.getImageData(0, 0, width, height);
               const data = imageData.data;
               
-              // コントラストを調整（QRコード用に調整）
-              const factor = 1.2; // コントラスト係数を緩和
-              const intercept = 128 * (1 - factor);
-              
+              // グレースケール変換とコントラスト強調
               for (let i = 0; i < data.length; i += 4) {
-                data[i] = factor * data[i] + intercept;     // R
-                data[i + 1] = factor * data[i + 1] + intercept; // G
-                data[i + 2] = factor * data[i + 2] + intercept; // B
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                const threshold = 128;
+                const value = avg > threshold ? 255 : 0;
+                data[i] = value;     // R
+                data[i + 1] = value; // G
+                data[i + 2] = value; // B
               }
               
               context.putImageData(imageData, 0, 0);
 
-              // 画像の品質を保持したままDataURLを生成（PNG形式で高品質）
+              // ZXingの設定を最適化
+              const hints = new Map();
+              hints.set('TRY_HARDER', true);
+              hints.set('POSSIBLE_FORMATS', ['QR_CODE']);
+              hints.set('CHARACTER_SET', 'UTF-8');
+              hints.set('PURE_BARCODE', true);
+              codeReaderRef.current.hints = hints;
+
+              // 画像の品質を保持したままDataURLを生成
               const dataUrl = canvas.toDataURL('image/png', 1.0);
               console.log('画像処理完了:', {
                 width,
@@ -279,17 +287,28 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               // コードを検出（複数回試行）
               let result = null;
               let attempts = 0;
-              const maxAttempts = 5;
+              const maxAttempts = 8; // 試行回数を増やす
 
               while (!result && attempts < maxAttempts) {
                 try {
                   console.log(`試行 ${attempts + 1} 回目: コード検出中...`);
                   
-                  // 画像の回転を試行（90度ずつ）
+                  // 画像の回転とスケーリングを試行
                   if (attempts > 0) {
                     context.save();
                     context.translate(canvas.width / 2, canvas.height / 2);
-                    context.rotate((Math.PI / 2) * attempts);
+                    
+                    // 回転（90度ずつ）
+                    if (attempts <= 4) {
+                      context.rotate((Math.PI / 2) * attempts);
+                    }
+                    
+                    // スケーリング（試行5-8）
+                    if (attempts > 4) {
+                      const scale = attempts === 5 ? 1.2 : attempts === 6 ? 0.8 : 1.5;
+                      context.scale(scale, scale);
+                    }
+                    
                     context.drawImage(img, -width / 2, -height / 2, width, height);
                     context.restore();
                   }
@@ -312,9 +331,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
                   // jsQRでの検出を試みる
                   try {
-                    const imageData = context.getImageData(0, 0, width, height);
-                    const jsQRResult = jsQR(imageData.data, width, height, {
-                      inversionAttempts: "dontInvert",
+                    const currentImageData = context.getImageData(0, 0, width, height);
+                    const jsQRResult = jsQR(currentImageData.data, width, height, {
+                      inversionAttempts: "attemptBoth"
                     });
 
                     if (jsQRResult) {
