@@ -14,6 +14,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(true);
+  const [isProcessingFolder, setIsProcessingFolder] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -414,6 +415,213 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     }
   };
 
+  // フォルダ内の画像を処理する関数
+  const handleFolderUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsProcessingFolder(true);
+    const results: { fileName: string; code: string | null }[] = [];
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file.type.startsWith('image/')) continue;
+
+        console.log(`処理中: ${file.name}`);
+        const result = await processImageFile(file);
+        results.push({
+          fileName: file.name,
+          code: result
+        });
+      }
+
+      // 結果の表示
+      const successfulScans = results.filter(r => r.code !== null);
+      console.log('フォルダ処理結果:', {
+        totalFiles: files.length,
+        successfulScans: successfulScans.length,
+        results
+      });
+
+      if (successfulScans.length === 0) {
+        setCameraError('QRコードを検出できませんでした。画像の品質やQRコードの状態を確認してください。');
+      }
+    } catch (error) {
+      console.error('フォルダ処理エラー:', error);
+      setCameraError('フォルダの処理中にエラーが発生しました。');
+    } finally {
+      setIsProcessingFolder(false);
+    }
+  };
+
+  // 画像ファイルを処理する関数
+  const processImageFile = async (file: File): Promise<string | null> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        if (!e.target?.result) {
+          resolve(null);
+          return;
+        }
+
+        const img = new Image();
+        img.onload = async () => {
+          if (canvasRef.current && codeReaderRef.current) {
+            const canvas = canvasRef.current;
+            const context = canvas.getContext('2d');
+            if (!context) {
+              resolve(null);
+              return;
+            }
+
+            // キャンバスのサイズを画像に合わせる
+            const maxSize = 3840;
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > maxSize || height > maxSize) {
+              if (width > height) {
+                height = Math.round((height * maxSize) / width);
+                width = maxSize;
+              } else {
+                width = Math.round((width * maxSize) / height);
+                height = maxSize;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            // 画像を描画
+            context.drawImage(img, 0, 0, width, height);
+
+            try {
+              // 画像の前処理
+              const imageData = context.getImageData(0, 0, width, height);
+              const data = imageData.data;
+              
+              // グレースケール変換とコントラスト強調
+              for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                const threshold = 128;
+                const value = avg > threshold ? 255 : 0;
+                data[i] = value;
+                data[i + 1] = value;
+                data[i + 2] = value;
+              }
+              
+              context.putImageData(imageData, 0, 0);
+
+              // ZXingの設定
+              const hints = new Map();
+              hints.set('TRY_HARDER', true);
+              hints.set('POSSIBLE_FORMATS', ['QR_CODE']);
+              hints.set('CHARACTER_SET', 'UTF-8');
+              hints.set('PURE_BARCODE', true);
+              codeReaderRef.current.hints = hints;
+
+              const dataUrl = canvas.toDataURL('image/png', 1.0);
+              let result = null;
+              let attempts = 0;
+              const maxAttempts = 8;
+
+              while (!result && attempts < maxAttempts) {
+                try {
+                  if (attempts > 0) {
+                    context.save();
+                    context.translate(canvas.width / 2, canvas.height / 2);
+                    
+                    if (attempts <= 4) {
+                      context.rotate((Math.PI / 2) * attempts);
+                    }
+                    
+                    if (attempts > 4) {
+                      const scale = attempts === 5 ? 1.2 : attempts === 6 ? 0.8 : 1.5;
+                      context.scale(scale, scale);
+                    }
+                    
+                    context.drawImage(img, -width / 2, -height / 2, width, height);
+                    context.restore();
+                  }
+
+                  // ZXingでの検出
+                  try {
+                    result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
+                    if (result) {
+                      const code = result.getText();
+                      if (!sessionScannedCodesRef.current.has(code)) {
+                        sessionScannedCodesRef.current.add(code);
+                        setScannedCodes(prev => {
+                          const newSet = new Set(prev);
+                          newSet.add(code);
+                          return new Set(Array.from(newSet).slice(-10));
+                        });
+                        setLastScannedCodes(prev => {
+                          const newCodes = [...prev, code];
+                          return newCodes.slice(-5);
+                        });
+                        onScanSuccess(code);
+                      }
+                      resolve(code);
+                      break;
+                    }
+                  } catch (zxingError) {
+                    console.log('ZXingでの検出失敗:', zxingError);
+                  }
+
+                  // jsQRでの検出
+                  try {
+                    const currentImageData = context.getImageData(0, 0, width, height);
+                    const jsQRResult = jsQR(currentImageData.data, width, height, {
+                      inversionAttempts: "attemptBoth"
+                    });
+
+                    if (jsQRResult) {
+                      const code = jsQRResult.data;
+                      if (!sessionScannedCodesRef.current.has(code)) {
+                        sessionScannedCodesRef.current.add(code);
+                        setScannedCodes(prev => {
+                          const newSet = new Set(prev);
+                          newSet.add(code);
+                          return new Set(Array.from(newSet).slice(-10));
+                        });
+                        setLastScannedCodes(prev => {
+                          const newCodes = [...prev, code];
+                          return newCodes.slice(-5);
+                        });
+                        onScanSuccess(code);
+                      }
+                      resolve(code);
+                      break;
+                    }
+                  } catch (jsQRError) {
+                    console.log('jsQRでの検出失敗:', jsQRError);
+                  }
+
+                } catch (err) {
+                  console.log(`試行 ${attempts + 1} 回目: 検出失敗`, err);
+                }
+                attempts++;
+              }
+
+              if (!result) {
+                resolve(null);
+              }
+            } catch (error) {
+              console.error('画像処理エラー:', error);
+              resolve(null);
+            }
+          } else {
+            resolve(null);
+          }
+        };
+        img.src = e.target.result as string;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const isValidUrl = (string: string) => {
     try {
       new URL(string);
@@ -458,7 +666,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               className="absolute top-0 left-0 w-full h-full pointer-events-none"
             />
           </div>
-          <div className="mt-4">
+          <div className="mt-4 space-y-4">
             <label className="block w-full p-4 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
               <span className="text-white">画像ファイルから読み取る</span>
               <input
@@ -468,8 +676,31 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 className="hidden"
               />
             </label>
+            <label className="block w-full p-4 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
+              <span className="text-white">フォルダから読み取る</span>
+              <input
+                type="file"
+                accept="image/*"
+                // @ts-ignore
+                webkitdirectory="true"
+                // @ts-ignore
+                directory="true"
+                multiple
+                onChange={handleFolderUpload}
+                className="hidden"
+              />
+            </label>
           </div>
         </>
+      )}
+      {isProcessingFolder && (
+        <div className="mt-4 p-4 bg-blue-900 border border-blue-700 rounded-lg text-blue-300 flex items-center">
+          <svg className="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          フォルダ内の画像を処理中...
+        </div>
       )}
       <div className="mt-6 space-y-6">
         {lastScannedCodes.length > 0 && (
