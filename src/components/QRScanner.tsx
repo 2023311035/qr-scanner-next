@@ -225,18 +225,32 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               hints.set('NEED_RESULT_POINT_CALLBACK', true);
               codeReaderRef.current.hints = hints;
 
-              // 画像の品質を保持したままDataURLを生成（JPEG形式で高品質）
-              const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
+              // 画像の品質を保持したままDataURLを生成（PNG形式で高品質）
+              const dataUrl = canvas.toDataURL('image/png', 1.0);
+              console.log('画像処理完了:', {
+                width,
+                height,
+                format: 'PNG',
+                quality: 1.0
+              });
               
               // コードを検出（複数回試行）
               let result = null;
               let attempts = 0;
-              const maxAttempts = 3;
+              const maxAttempts = 5; // 試行回数を増やす
 
               while (!result && attempts < maxAttempts) {
                 try {
+                  console.log(`試行 ${attempts + 1} 回目: QRコード検出中...`);
                   result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
-                  if (result) break;
+                  if (result) {
+                    console.log('QRコード検出成功:', {
+                      text: result.getText(),
+                      format: result.getBarcodeFormat(),
+                      timestamp: new Date().toISOString()
+                    });
+                    break;
+                  }
                 } catch (err) {
                   console.log(`試行 ${attempts + 1} 回目: 検出失敗`, err);
                 }
@@ -248,7 +262,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 console.log('画像から検出されたコード:', {
                   text: code,
                   format: result.getBarcodeFormat(),
-                  imageSize: { width, height }
+                  imageSize: { width, height },
+                  timestamp: new Date().toISOString()
                 });
 
                 // 重複チェック
@@ -275,7 +290,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 // コールバックを呼び出し
                 onScanSuccess(code);
               } else {
-                console.log('画像からコードを検出できませんでした');
+                console.log('画像からコードを検出できませんでした:', {
+                  attempts,
+                  imageSize: { width, height },
+                  timestamp: new Date().toISOString()
+                });
               }
             } catch (error) {
               console.error('画像からのコード読み取りエラー:', error);
