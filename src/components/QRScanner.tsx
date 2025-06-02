@@ -334,11 +334,42 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.imageSmoothingQuality = 'high';
             context.drawImage(img, 0, 0, width, height);
 
-            // まずオリジナル画像で検出を試す
-            let result = null;
-            let attempts = 0;
-            const maxAttempts = 8;
-            let dataUrl = canvas.toDataURL('image/png', 1.0);
+            // まずjsQRでそのまま読む
+            let currentImageData = context.getImageData(0, 0, width, height);
+            let jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
+            if (!jsQRResult) {
+              // グレースケール＋コントラスト強調
+              const data = currentImageData.data;
+              for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                const contrast = 1.5;
+                const contrasted = Math.min(255, Math.max(0, (avg - 128) * contrast + 128));
+                data[i] = data[i + 1] = data[i + 2] = contrasted;
+              }
+              context.putImageData(currentImageData, 0, 0);
+              jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
+            }
+            if (jsQRResult) {
+              const code = jsQRResult.data;
+              // 重複チェック
+              if (sessionScannedCodesRef.current.has(code)) {
+                console.log('重複コードを検出 - 無視します:', code);
+                return;
+              }
+              sessionScannedCodesRef.current.add(code);
+              setScannedCodes(prev => {
+                const newSet = new Set(prev);
+                newSet.add(code);
+                return new Set(Array.from(newSet).slice(-10));
+              });
+              setLastScannedCodes(prev => {
+                const newCodes = [...prev, code];
+                return newCodes.slice(-5);
+              });
+              onScanSuccess(code);
+              pauseScanning();
+              return;
+            }
 
             // ZXingのhintsを設定
             const hints = new Map();
@@ -358,7 +389,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             hints.set('CHARACTER_SET', 'UTF-8');
             codeReaderRef.current.hints = hints;
 
-            // オリジナル画像で検出
+            // ZXingで検出
+            let result = null;
+            let attempts = 0;
+            const maxAttempts = 8;
+            let dataUrl = canvas.toDataURL('image/png', 1.0);
             while (!result && attempts < maxAttempts) {
               try {
                 if (attempts > 0) {
@@ -374,77 +409,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   context.drawImage(img, -width / 2, -height / 2, width, height);
                   context.restore();
                 }
-
-                // ZXingで検出
-                try {
-                  result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
-                  if (result) break;
-                } catch {}
-
-                // jsQRで検出（QRコードのみ）
-                try {
-                  const currentImageData = context.getImageData(0, 0, width, height);
-                  const jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
-                  if (jsQRResult) {
-                    result = {
-                      getText: () => jsQRResult.data,
-                      getBarcodeFormat: () => 'QR_CODE'
-                    };
-                    break;
-                  }
-                } catch {}
+                result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
+                if (result) break;
               } catch {}
               attempts++;
-            }
-
-            // オリジナルで失敗した場合のみグレースケール変換して再度試す
-            if (!result) {
-              const imageData = context.getImageData(0, 0, width, height);
-              const data = imageData.data;
-              for (let i = 0; i < data.length; i += 4) {
-                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                data[i] = avg; data[i + 1] = avg; data[i + 2] = avg;
-              }
-              context.putImageData(imageData, 0, 0);
-              dataUrl = canvas.toDataURL('image/png', 1.0);
-              attempts = 0;
-              while (!result && attempts < maxAttempts) {
-                try {
-                  if (attempts > 0) {
-                    context.save();
-                    context.translate(canvas.width / 2, canvas.height / 2);
-                    if (attempts <= 4) {
-                      context.rotate((Math.PI / 2) * attempts);
-                    }
-                    if (attempts > 4) {
-                      const scale = attempts === 5 ? 1.2 : attempts === 6 ? 0.8 : 1.5;
-                      context.scale(scale, scale);
-                    }
-                    context.drawImage(img, -width / 2, -height / 2, width, height);
-                    context.restore();
-                  }
-
-                  // ZXingで検出
-                  try {
-                    result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
-                    if (result) break;
-                  } catch {}
-
-                  // jsQRで検出（QRコードのみ）
-                  try {
-                    const currentImageData = context.getImageData(0, 0, width, height);
-                    const jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
-                    if (jsQRResult) {
-                      result = {
-                        getText: () => jsQRResult.data,
-                        getBarcodeFormat: () => 'QR_CODE'
-                      };
-                      break;
-                    }
-                  } catch {}
-                } catch {}
-                attempts++;
-              }
             }
 
             // 結果処理
@@ -456,32 +424,21 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 imageSize: { width, height },
                 timestamp: new Date().toISOString()
               });
-
-              // 重複チェック
               if (sessionScannedCodesRef.current.has(code)) {
                 console.log('重複コードを検出 - 無視します:', code);
                 return;
               }
-
-              // 新しいコードの場合のみ処理を実行
               sessionScannedCodesRef.current.add(code);
-
-              // 履歴に追加
               setScannedCodes(prev => {
                 const newSet = new Set(prev);
                 newSet.add(code);
                 return new Set(Array.from(newSet).slice(-10));
               });
-
               setLastScannedCodes(prev => {
                 const newCodes = [...prev, code];
                 return newCodes.slice(-5);
               });
-
-              // コールバックを呼び出し
               onScanSuccess(code);
-
-              // 重複を防ぐために一時的にスキャンを停止
               pauseScanning();
             } else {
               console.log('画像からコードを検出できませんでした:', {
