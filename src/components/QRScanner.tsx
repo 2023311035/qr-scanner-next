@@ -101,7 +101,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   'CODE_39',
                   'CODE_128',
                   'ITF',
-                  'CODABAR'
+                  'CODABAR',
+                  'DATA_MATRIX',
+                  'AZTEC',
+                  'PDF_417',
+                  'MAXICODE'
                 ]);
                 codeReaderRef.current.hints = hints;
 
@@ -115,6 +119,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     }
                     if (result) {
                       const code = result.getText();
+                      console.log('検出されたコード:', {
+                        text: code,
+                        format: result.getBarcodeFormat()
+                      });
                       
                       // 重複チェックを厳密に行う
                       if (sessionScannedCodesRef.current.has(code)) {
@@ -123,10 +131,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                       }
 
                       // 新しいコードの場合のみ処理を実行
-                      console.log('新しいコードを検出:', {
-                        text: code,
-                        format: result.getBarcodeFormat()
-                      });
                       sessionScannedCodesRef.current.add(code);
 
                       // 履歴に追加
@@ -193,20 +197,62 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             const context = canvas.getContext('2d');
             if (!context) return;
 
-            // キャンバスのサイズを画像に合わせる
-            canvas.width = img.width;
-            canvas.height = img.height;
-            context.drawImage(img, 0, 0);
+            // キャンバスのサイズを画像に合わせる（最大サイズを制限）
+            const maxSize = 1920;
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > maxSize || height > maxSize) {
+              if (width > height) {
+                height = Math.round((height * maxSize) / width);
+                width = maxSize;
+              } else {
+                width = Math.round((width * maxSize) / height);
+                height = maxSize;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+
+            // 画像を描画（高品質設定）
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
+            context.drawImage(img, 0, 0, width, height);
 
             try {
+              // ZXingの検出精度を向上させる設定
+              const hints = new Map();
+              hints.set('TRY_HARDER', true);
+              hints.set('POSSIBLE_FORMATS', [
+                'QR_CODE',
+                'EAN_13',
+                'EAN_8',
+                'UPC_A',
+                'UPC_E',
+                'CODE_39',
+                'CODE_128',
+                'ITF',
+                'CODABAR',
+                'DATA_MATRIX',
+                'AZTEC',
+                'PDF_417',
+                'MAXICODE'
+              ]);
+              codeReaderRef.current.hints = hints;
+
+              // 画像の品質を保持したままDataURLを生成
+              const dataUrl = canvas.toDataURL('image/png', 1.0);
+              
               // コードを検出
-              const result = await codeReaderRef.current.decodeFromImageUrl(canvas.toDataURL());
+              const result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
               
               if (result) {
                 const code = result.getText();
                 console.log('画像から検出されたコード:', {
                   text: code,
-                  format: result.getBarcodeFormat()
+                  format: result.getBarcodeFormat(),
+                  imageSize: { width, height }
                 });
 
                 // 重複チェック
