@@ -249,66 +249,25 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.drawImage(img, 0, 0, width, height);
 
             try {
-              // 画像の前処理を強化
-              const imageData = context.getImageData(0, 0, width, height);
-              const data = imageData.data;
-              
-              // グレースケール変換とコントラスト強調
-              for (let i = 0; i < data.length; i += 4) {
-                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                const threshold = 128;
-                const value = avg > threshold ? 255 : 0;
-                data[i] = value;     // R
-                data[i + 1] = value; // G
-                data[i + 2] = value; // B
-              }
-              
-              context.putImageData(imageData, 0, 0);
-
-              // ZXingの設定を最適化
-              const hints = new Map();
-              hints.set('TRY_HARDER', true);
-              hints.set('POSSIBLE_FORMATS', ['QR_CODE']);
-              hints.set('CHARACTER_SET', 'UTF-8');
-              hints.set('PURE_BARCODE', true);
-              codeReaderRef.current.hints = hints;
-
               // 画像の品質を保持したままDataURLを生成
               const dataUrl = canvas.toDataURL('image/png', 1.0);
-              console.log('画像処理完了:', {
-                width,
-                height,
-                format: 'PNG',
-                quality: 1.0,
-                originalWidth: img.width,
-                originalHeight: img.height
-              });
-              
-              // コードを検出（複数回試行）
               let result = null;
               let attempts = 0;
-              const maxAttempts = 8; // 試行回数を増やす
+              const maxAttempts = 8;
 
               while (!result && attempts < maxAttempts) {
                 try {
-                  console.log(`試行 ${attempts + 1} 回目: コード検出中...`);
-                  
                   // 画像の回転とスケーリングを試行
                   if (attempts > 0) {
                     context.save();
                     context.translate(canvas.width / 2, canvas.height / 2);
-                    
-                    // 回転（90度ずつ）
                     if (attempts <= 4) {
                       context.rotate((Math.PI / 2) * attempts);
                     }
-                    
-                    // スケーリング（試行5-8）
                     if (attempts > 4) {
                       const scale = attempts === 5 ? 1.2 : attempts === 6 ? 0.8 : 1.5;
                       context.scale(scale, scale);
                     }
-                    
                     context.drawImage(img, -width / 2, -height / 2, width, height);
                     context.restore();
                   }
@@ -357,7 +316,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 }
                 attempts++;
               }
-              
+
               if (result) {
                 const code = result.getText();
                 console.log('画像から検出されたコード:', {
