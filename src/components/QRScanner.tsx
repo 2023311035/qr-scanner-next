@@ -12,10 +12,23 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
+  const [isScanning, setIsScanning] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const sessionScannedCodesRef = useRef<Set<string>>(new Set());
+  const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // スキャン処理を一時停止する関数
+  const pauseScanning = () => {
+    setIsScanning(false);
+    if (scanTimeoutRef.current) {
+      clearTimeout(scanTimeoutRef.current);
+    }
+    scanTimeoutRef.current = setTimeout(() => {
+      setIsScanning(true);
+    }, 1000);
+  };
 
   useEffect(() => {
     let video: HTMLVideoElement | null = null;
@@ -112,7 +125,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                       console.error('スキャンエラー:', error);
                       return;
                     }
-                    if (result) {
+                    if (result && isScanning) {
                       const code = result.getText();
                       console.log('検出されたコード:', {
                         text: code,
@@ -142,6 +155,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
                       // コールバックを呼び出し
                       onScanSuccess(code);
+
+                      // 重複を防ぐために一時的にスキャンを停止
+                      pauseScanning();
                     }
                   }
                 );
@@ -172,6 +188,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       if (video && video.srcObject) {
         const stream = video.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
+      }
+      if (scanTimeoutRef.current) {
+        clearTimeout(scanTimeoutRef.current);
       }
     };
   }, [onScanSuccess]);
