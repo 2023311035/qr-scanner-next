@@ -248,6 +248,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.imageSmoothingQuality = 'high';
             context.drawImage(img, 0, 0, width, height);
 
+            // グレースケール変換のみ
+            const imageData = context.getImageData(0, 0, width, height);
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+              const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+              data[i] = avg;     // R
+              data[i + 1] = avg; // G
+              data[i + 2] = avg; // B
+            }
+            context.putImageData(imageData, 0, 0);
+
             try {
               // 画像の品質を保持したままDataURLを生成
               const dataUrl = canvas.toDataURL('image/png', 1.0);
