@@ -101,6 +101,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 ]);
                 hints.set('CHARACTER_SET', 'UTF-8');
                 hints.set('PURE_BARCODE', false);
+                hints.set('NEED_RESULT_POINT_CALLBACK', true);
                 codeReaderRef.current.hints = hints;
 
                 await codeReaderRef.current.decodeFromVideoDevice(
@@ -218,22 +219,29 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               // ZXingの検出精度を向上させる設定
               const hints = new Map();
               hints.set('TRY_HARDER', true);
-              hints.set('POSSIBLE_FORMATS', [
-                'QR_CODE',
-                'DATA_MATRIX',
-                'AZTEC',
-                'PDF_417',
-                'MAXICODE'
-              ]);
+              hints.set('POSSIBLE_FORMATS', ['QR_CODE']);
               hints.set('CHARACTER_SET', 'UTF-8');
               hints.set('PURE_BARCODE', false);
+              hints.set('NEED_RESULT_POINT_CALLBACK', true);
               codeReaderRef.current.hints = hints;
 
-              // 画像の品質を保持したままDataURLを生成
-              const dataUrl = canvas.toDataURL('image/png', 1.0);
+              // 画像の品質を保持したままDataURLを生成（JPEG形式で高品質）
+              const dataUrl = canvas.toDataURL('image/jpeg', 1.0);
               
-              // コードを検出
-              const result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
+              // コードを検出（複数回試行）
+              let result = null;
+              let attempts = 0;
+              const maxAttempts = 3;
+
+              while (!result && attempts < maxAttempts) {
+                try {
+                  result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
+                  if (result) break;
+                } catch (error) {
+                  console.log(`試行 ${attempts + 1} 回目: 検出失敗`);
+                }
+                attempts++;
+              }
               
               if (result) {
                 const code = result.getText();
