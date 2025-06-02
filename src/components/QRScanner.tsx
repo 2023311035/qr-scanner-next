@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import jsQR from 'jsqr';
 
@@ -24,41 +24,30 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const processingCodeRef = useRef<boolean>(false);
 
   // コード処理を一元化する関数
-  const processScannedCode = (code: string) => {
+  const processScannedCode = useCallback((code: string) => {
     if (processingCodeRef.current) return;
     processingCodeRef.current = true;
-
     try {
-      // 重複チェックを厳密に行う
       if (sessionScannedCodesRef.current.has(code)) {
         console.log('重複コードを検出 - 無視します:', code);
         return;
       }
-
-      // 新しいコードの場合のみ処理を実行
       sessionScannedCodesRef.current.add(code);
-
-      // 履歴に追加
       setScannedCodes(prev => {
         const newSet = new Set(prev);
         newSet.add(code);
         return new Set(Array.from(newSet).slice(-10));
       });
-
       setLastScannedCodes(prev => {
         const newCodes = [...prev, code];
         return newCodes.slice(-5);
       });
-
-      // コールバックを呼び出し
       onScanSuccess(code);
-
-      // 重複を防ぐために一時的にスキャンを停止
       pauseScanning();
     } finally {
       processingCodeRef.current = false;
     }
-  };
+  }, [onScanSuccess]);
 
   // スキャン処理を一時停止する関数
   const pauseScanning = () => {
@@ -71,7 +60,22 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     }, 1000);
   };
 
-  // ピンチズームの処理を追加
+  // ピンチズームの処理をuseCallbackでラップ
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2 && lastTouchDistanceRef.current !== null) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      const delta = currentDistance / lastTouchDistanceRef.current;
+      const newScale = Math.min(Math.max(scale * delta, 1), 3);
+      setScale(newScale);
+      lastTouchDistanceRef.current = currentDistance;
+    }
+  }, [scale]);
+
   const handleTouchStart = (e: TouchEvent) => {
     if (e.touches.length === 2) {
       const touch1 = e.touches[0];
@@ -80,23 +84,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         touch2.clientX - touch1.clientX,
         touch2.clientY - touch1.clientY
       );
-    }
-  };
-
-  const handleTouchMove = (e: TouchEvent) => {
-    if (e.touches.length === 2 && lastTouchDistanceRef.current !== null) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const currentDistance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-      
-      const delta = currentDistance / lastTouchDistanceRef.current;
-      const newScale = Math.min(Math.max(scale * delta, 1), 3);
-      
-      setScale(newScale);
-      lastTouchDistanceRef.current = currentDistance;
     }
   };
 
@@ -265,7 +252,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         clearTimeout(scanTimeoutRef.current);
       }
     };
-  }, [onScanSuccess, isScanning]);
+  }, [onScanSuccess, isScanning, processScannedCode]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -280,7 +267,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         video.removeEventListener('touchend', handleTouchEnd);
       };
     }
-  }, [scale]);
+  }, [scale, handleTouchMove]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -335,7 +322,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.drawImage(img, 0, 0, width, height);
 
             // まずjsQRでそのまま読む
-            let currentImageData = context.getImageData(0, 0, width, height);
+            const currentImageData = context.getImageData(0, 0, width, height);
             let jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
             if (!jsQRResult) {
               // グレースケール＋コントラスト強調
@@ -393,7 +380,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             let result = null;
             let attempts = 0;
             const maxAttempts = 8;
-            let dataUrl = canvas.toDataURL('image/png', 1.0);
+            const dataUrl = canvas.toDataURL('image/png', 1.0);
             while (!result && attempts < maxAttempts) {
               try {
                 if (attempts > 0) {
