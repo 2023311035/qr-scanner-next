@@ -175,7 +175,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [onScanSuccess]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -199,9 +199,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.drawImage(img, 0, 0);
 
             try {
-              // 画像データを取得
-              const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-              
               // コードを検出
               const result = await codeReaderRef.current.decodeFromImageUrl(canvas.toDataURL());
               
