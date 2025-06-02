@@ -181,46 +181,74 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const img = new Image();
-      img.onload = async () => {
-        if (canvasRef.current && codeReaderRef.current) {
-          const canvas = canvasRef.current;
-          const context = canvas.getContext('2d');
-          if (context) {
+    try {
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        if (!e.target?.result) return;
+
+        const img = new Image();
+        img.onload = async () => {
+          if (canvasRef.current && codeReaderRef.current) {
+            const canvas = canvasRef.current;
+            const context = canvas.getContext('2d');
+            if (!context) return;
+
+            // キャンバスのサイズを画像に合わせる
             canvas.width = img.width;
             canvas.height = img.height;
             context.drawImage(img, 0, 0);
-            
+
             try {
-              const img = new Image();
-              img.src = canvas.toDataURL();
-              await new Promise((resolve) => {
-                img.onload = resolve;
-              });
-              const result = await codeReaderRef.current.decodeFromImageUrl(img.src);
+              // 画像データを取得
+              const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+              
+              // コードを検出
+              const result = await codeReaderRef.current.decodeFromImageUrl(canvas.toDataURL());
+              
               if (result) {
                 const code = result.getText();
-                if (!scannedCodes.has(code)) {
-                  setScannedCodes(prev => {
-                    const arr = Array.from(prev);
-                    arr.push(code);
-                    return new Set(arr.slice(-10));
-                  });
-                  setLastScannedCodes([code]);
-                  onScanSuccess(code);
+                console.log('画像から検出されたコード:', {
+                  text: code,
+                  format: result.getBarcodeFormat()
+                });
+
+                // 重複チェック
+                if (sessionScannedCodesRef.current.has(code)) {
+                  console.log('重複コードを検出 - 無視します:', code);
+                  return;
                 }
+
+                // 新しいコードの場合のみ処理を実行
+                sessionScannedCodesRef.current.add(code);
+
+                // 履歴に追加
+                setScannedCodes(prev => {
+                  const newSet = new Set(prev);
+                  newSet.add(code);
+                  return new Set(Array.from(newSet).slice(-10));
+                });
+
+                setLastScannedCodes(prev => {
+                  const newCodes = [...prev, code];
+                  return newCodes.slice(-5);
+                });
+
+                // コールバックを呼び出し
+                onScanSuccess(code);
+              } else {
+                console.log('画像からコードを検出できませんでした');
               }
             } catch (error) {
-              console.error('画像からのバーコード読み取りエラー:', error);
+              console.error('画像からのコード読み取りエラー:', error);
             }
           }
-        }
+        };
+        img.src = e.target.result as string;
       };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error('ファイル読み込みエラー:', error);
+    }
   };
 
   const isValidUrl = (string: string) => {
