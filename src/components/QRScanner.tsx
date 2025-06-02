@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import jsQR from 'jsqr';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
