@@ -126,19 +126,72 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             if (video && codeReaderRef.current) {
               try {
                 console.log('スキャン開始...');
-                // ZXingの検出精度を向上させる設定
+                // jsQRの設定
+                const scanWithJsQR = () => {
+                  if (!video || !canvasRef.current) return;
+                  
+                  const canvas = canvasRef.current;
+                  const context = canvas.getContext('2d');
+                  if (!context) return;
+
+                  // キャンバスのサイズをビデオに合わせる
+                  canvas.width = video.videoWidth;
+                  canvas.height = video.videoHeight;
+                  
+                  // ビデオフレームをキャンバスに描画
+                  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                  
+                  // 画像データを取得
+                  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+                  
+                  // jsQRでスキャン
+                  const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                  });
+
+                  if (code && isScanning) {
+                    console.log('jsQRで検出されたコード:', {
+                      text: code.data,
+                      format: 'QR_CODE'
+                    });
+
+                    // 重複チェックを厳密に行う
+                    if (sessionScannedCodesRef.current.has(code.data)) {
+                      console.log('重複コードを検出 - 無視します:', code.data);
+                      return;
+                    }
+
+                    // 新しいコードの場合のみ処理を実行
+                    sessionScannedCodesRef.current.add(code.data);
+
+                    // 履歴に追加
+                    setScannedCodes(prev => {
+                      const newSet = new Set(prev);
+                      newSet.add(code.data);
+                      return new Set(Array.from(newSet).slice(-10));
+                    });
+
+                    setLastScannedCodes(prev => {
+                      const newCodes = [...prev, code.data];
+                      return newCodes.slice(-5);
+                    });
+
+                    // コールバックを呼び出し
+                    onScanSuccess(code.data);
+
+                    // 重複を防ぐために一時的にスキャンを停止
+                    pauseScanning();
+                  }
+                };
+
+                // jsQRのスキャンループを開始
+                const jsQRInterval = setInterval(scanWithJsQR, 100);
+
+                // ZXingはバックアップとして設定
                 const hints = new Map();
                 hints.set('TRY_HARDER', true);
-                hints.set('POSSIBLE_FORMATS', [
-                  'QR_CODE',
-                  'DATA_MATRIX',
-                  'AZTEC',
-                  'PDF_417',
-                  'MAXICODE'
-                ]);
+                hints.set('POSSIBLE_FORMATS', ['QR_CODE']);
                 hints.set('CHARACTER_SET', 'UTF-8');
-                hints.set('PURE_BARCODE', false);
-                hints.set('NEED_RESULT_POINT_CALLBACK', true);
                 codeReaderRef.current.hints = hints;
 
                 await codeReaderRef.current.decodeFromVideoDevice(
@@ -146,12 +199,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   video,
                   (result, error) => {
                     if (error) {
-                      console.error('スキャンエラー:', error);
+                      console.error('ZXingスキャンエラー:', error);
                       return;
                     }
                     if (result && isScanning) {
                       const code = result.getText();
-                      console.log('検出されたコード:', {
+                      console.log('ZXingで検出されたコード:', {
                         text: code,
                         format: result.getBarcodeFormat()
                       });
@@ -185,9 +238,18 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     }
                   }
                 );
-                console.log('ZXingスキャン開始成功');
+
+                // クリーンアップ関数
+                return () => {
+                  clearInterval(jsQRInterval);
+                  if (codeReaderRef.current) {
+                    // ZXingのクリーンアップ
+                    codeReaderRef.current = null;
+                  }
+                };
+
               } catch (error) {
-                console.error('ZXingスキャンエラー:', error);
+                console.error('スキャンエラー:', error);
               }
             }
           };
