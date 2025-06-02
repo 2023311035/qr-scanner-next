@@ -21,6 +21,44 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const sessionScannedCodesRef = useRef<Set<string>>(new Set());
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTouchDistanceRef = useRef<number | null>(null);
+  const processingCodeRef = useRef<boolean>(false);
+
+  // コード処理を一元化する関数
+  const processScannedCode = (code: string) => {
+    if (processingCodeRef.current) return;
+    processingCodeRef.current = true;
+
+    try {
+      // 重複チェックを厳密に行う
+      if (sessionScannedCodesRef.current.has(code)) {
+        console.log('重複コードを検出 - 無視します:', code);
+        return;
+      }
+
+      // 新しいコードの場合のみ処理を実行
+      sessionScannedCodesRef.current.add(code);
+
+      // 履歴に追加
+      setScannedCodes(prev => {
+        const newSet = new Set(prev);
+        newSet.add(code);
+        return new Set(Array.from(newSet).slice(-10));
+      });
+
+      setLastScannedCodes(prev => {
+        const newCodes = [...prev, code];
+        return newCodes.slice(-5);
+      });
+
+      // コールバックを呼び出し
+      onScanSuccess(code);
+
+      // 重複を防ぐために一時的にスキャンを停止
+      pauseScanning();
+    } finally {
+      processingCodeRef.current = false;
+    }
+  };
 
   // スキャン処理を一時停止する関数
   const pauseScanning = () => {
@@ -128,7 +166,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 console.log('スキャン開始...');
                 // jsQRの設定
                 const scanWithJsQR = () => {
-                  if (!video || !canvasRef.current) return;
+                  if (!video || !canvasRef.current || !isScanning) return;
                   
                   const canvas = canvasRef.current;
                   const context = canvas.getContext('2d');
@@ -149,38 +187,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     inversionAttempts: "dontInvert",
                   });
 
-                  if (code && isScanning) {
+                  if (code) {
                     console.log('jsQRで検出されたコード:', {
                       text: code.data,
                       format: 'QR_CODE'
                     });
-
-                    // 重複チェックを厳密に行う
-                    if (sessionScannedCodesRef.current.has(code.data)) {
-                      console.log('重複コードを検出 - 無視します:', code.data);
-                      return;
-                    }
-
-                    // 新しいコードの場合のみ処理を実行
-                    sessionScannedCodesRef.current.add(code.data);
-
-                    // 履歴に追加
-                    setScannedCodes(prev => {
-                      const newSet = new Set(prev);
-                      newSet.add(code.data);
-                      return new Set(Array.from(newSet).slice(-10));
-                    });
-
-                    setLastScannedCodes(prev => {
-                      const newCodes = [...prev, code.data];
-                      return newCodes.slice(-5);
-                    });
-
-                    // コールバックを呼び出し
-                    onScanSuccess(code.data);
-
-                    // 重複を防ぐために一時的にスキャンを停止
-                    pauseScanning();
+                    processScannedCode(code.data);
                   }
                 };
 
@@ -208,33 +220,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                         text: code,
                         format: result.getBarcodeFormat()
                       });
-                      
-                      // 重複チェックを厳密に行う
-                      if (sessionScannedCodesRef.current.has(code)) {
-                        console.log('重複コードを検出 - 無視します:', code);
-                        return;
-                      }
-
-                      // 新しいコードの場合のみ処理を実行
-                      sessionScannedCodesRef.current.add(code);
-
-                      // 履歴に追加
-                      setScannedCodes(prev => {
-                        const newSet = new Set(prev);
-                        newSet.add(code);
-                        return new Set(Array.from(newSet).slice(-10));
-                      });
-
-                      setLastScannedCodes(prev => {
-                        const newCodes = [...prev, code];
-                        return newCodes.slice(-5);
-                      });
-
-                      // コールバックを呼び出し
-                      onScanSuccess(code);
-
-                      // 重複を防ぐために一時的にスキャンを停止
-                      pauseScanning();
+                      processScannedCode(code);
                     }
                   }
                 );
