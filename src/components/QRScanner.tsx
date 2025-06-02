@@ -181,6 +181,19 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     if (!file) return;
 
     try {
+      // ZXingの初期化を確認
+      if (!codeReaderRef.current) {
+        console.log('ZXingを初期化中...');
+        try {
+          codeReaderRef.current = new BrowserMultiFormatReader();
+          console.log('ZXing初期化成功');
+        } catch (error) {
+          console.error('ZXing初期化エラー:', error);
+          setCameraError('QRコードスキャナーの初期化に失敗しました。ページを再読み込みしてください。');
+          return;
+        }
+      }
+
       const reader = new FileReader();
       reader.onload = async (e) => {
         if (!e.target?.result) return;
@@ -193,7 +206,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             if (!context) return;
 
             // キャンバスのサイズを画像に合わせる（最大サイズを制限）
-            const maxSize = 1920;
+            const maxSize = 3840; // 最大サイズを増加
             let width = img.width;
             let height = img.height;
             
@@ -237,7 +250,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               // コードを検出（複数回試行）
               let result = null;
               let attempts = 0;
-              const maxAttempts = 5; // 試行回数を増やす
+              const maxAttempts = 5;
 
               while (!result && attempts < maxAttempts) {
                 try {
@@ -295,9 +308,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   imageSize: { width, height },
                   timestamp: new Date().toISOString()
                 });
+                // エラーメッセージを表示
+                setCameraError('QRコードを検出できませんでした。画像の品質やQRコードの状態を確認してください。');
               }
             } catch (error) {
               console.error('画像からのコード読み取りエラー:', error);
+              setCameraError('QRコードの読み取り中にエラーが発生しました。');
             }
           }
         };
@@ -306,6 +322,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       reader.readAsDataURL(file);
     } catch (error) {
       console.error('ファイル読み込みエラー:', error);
+      setCameraError('ファイルの読み込み中にエラーが発生しました。');
     }
   };
 
