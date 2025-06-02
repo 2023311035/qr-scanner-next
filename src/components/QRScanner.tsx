@@ -195,7 +195,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         clearTimeout(scanTimeoutRef.current);
       }
     };
-  }, [onScanSuccess]);
+  }, [onScanSuccess, isScanning]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -681,10 +681,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               <input
                 type="file"
                 accept="image/*"
-                // @ts-ignore
-                webkitdirectory="true"
-                // @ts-ignore
-                directory="true"
                 multiple
                 onChange={handleFolderUpload}
                 className="hidden"
