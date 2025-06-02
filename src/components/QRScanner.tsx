@@ -676,16 +676,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 className="hidden"
               />
             </label>
-            <label className="block w-full p-4 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
-              <span className="text-white">フォルダから読み取る</span>
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleFolderUpload}
-                className="hidden"
-              />
-            </label>
           </div>
         </>
       )}
