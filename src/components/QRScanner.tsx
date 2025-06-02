@@ -14,11 +14,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(true);
+  const [scale, setScale] = useState(1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const sessionScannedCodesRef = useRef<Set<string>>(new Set());
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTouchDistanceRef = useRef<number | null>(null);
 
   // スキャン処理を一時停止する関数
   const pauseScanning = () => {
@@ -29,6 +31,39 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     scanTimeoutRef.current = setTimeout(() => {
       setIsScanning(true);
     }, 1000);
+  };
+
+  // ピンチズームの処理を追加
+  const handleTouchStart = (e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      lastTouchDistanceRef.current = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+    }
+  };
+
+  const handleTouchMove = (e: TouchEvent) => {
+    if (e.touches.length === 2 && lastTouchDistanceRef.current !== null) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      
+      const delta = currentDistance / lastTouchDistanceRef.current;
+      const newScale = Math.min(Math.max(scale * delta, 1), 3);
+      
+      setScale(newScale);
+      lastTouchDistanceRef.current = currentDistance;
+    }
+  };
+
+  const handleTouchEnd = () => {
+    lastTouchDistanceRef.current = null;
   };
 
   useEffect(() => {
@@ -183,6 +218,21 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       }
     };
   }, [onScanSuccess, isScanning]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.addEventListener('touchstart', handleTouchStart);
+      video.addEventListener('touchmove', handleTouchMove);
+      video.addEventListener('touchend', handleTouchEnd);
+
+      return () => {
+        video.removeEventListener('touchstart', handleTouchStart);
+        video.removeEventListener('touchmove', handleTouchMove);
+        video.removeEventListener('touchend', handleTouchEnd);
+      };
+    }
+  }, [scale]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -420,10 +470,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         </div>
       ) : (
         <>
-          <div className="relative w-full" style={{ height: '70vh', maxWidth: '400px', margin: '0 auto' }}>
+          <div className="relative w-full overflow-hidden" style={{ height: '70vh', maxWidth: '400px', margin: '0 auto' }}>
             <video
               ref={videoRef}
-              className="w-full h-full object-cover rounded-lg"
+              className="w-full h-full object-cover rounded-lg transition-transform duration-200"
+              style={{ transform: `scale(${scale})` }}
               playsInline
               muted
             />
