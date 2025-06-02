@@ -473,7 +473,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-lg font-semibold text-white">スキャン履歴:</h3>
             <button
-              onClick={() => setScannedCodes(new Set())}
+              onClick={() => {
+                setScannedCodes(new Set());
+                sessionScannedCodesRef.current = new Set();
+              }}
               className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
             >
               履歴をクリア
