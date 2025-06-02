@@ -94,19 +94,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 hints.set('TRY_HARDER', true);
                 hints.set('POSSIBLE_FORMATS', [
                   'QR_CODE',
-                  'EAN_13',
-                  'EAN_8',
-                  'UPC_A',
-                  'UPC_E',
-                  'CODE_39',
-                  'CODE_128',
-                  'ITF',
-                  'CODABAR',
                   'DATA_MATRIX',
                   'AZTEC',
                   'PDF_417',
                   'MAXICODE'
                 ]);
+                hints.set('CHARACTER_SET', 'UTF-8');
+                hints.set('PURE_BARCODE', false);
                 codeReaderRef.current.hints = hints;
 
                 await codeReaderRef.current.decodeFromVideoDevice(
@@ -226,19 +220,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               hints.set('TRY_HARDER', true);
               hints.set('POSSIBLE_FORMATS', [
                 'QR_CODE',
-                'EAN_13',
-                'EAN_8',
-                'UPC_A',
-                'UPC_E',
-                'CODE_39',
-                'CODE_128',
-                'ITF',
-                'CODABAR',
                 'DATA_MATRIX',
                 'AZTEC',
                 'PDF_417',
                 'MAXICODE'
               ]);
+              hints.set('CHARACTER_SET', 'UTF-8');
+              hints.set('PURE_BARCODE', false);
               codeReaderRef.current.hints = hints;
 
               // 画像の品質を保持したままDataURLを生成
