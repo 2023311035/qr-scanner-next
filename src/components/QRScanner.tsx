@@ -236,27 +236,70 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.imageSmoothingQuality = 'high';
             context.drawImage(img, 0, 0, width, height);
 
-            // グレースケール変換のみ
-            const imageData = context.getImageData(0, 0, width, height);
-            const data = imageData.data;
-            for (let i = 0; i < data.length; i += 4) {
-              const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-              data[i] = avg;     // R
-              data[i + 1] = avg; // G
-              data[i + 2] = avg; // B
+            // まずオリジナル画像でQR検出を試す
+            let result = null;
+            let attempts = 0;
+            const maxAttempts = 8;
+            let dataUrl = canvas.toDataURL('image/png', 1.0);
+
+            // ZXingのhintsをQR_CODE専用に
+            const hints = new Map();
+            hints.set('TRY_HARDER', true);
+            hints.set('POSSIBLE_FORMATS', ['QR_CODE']);
+            hints.set('CHARACTER_SET', 'UTF-8');
+            hints.set('PURE_BARCODE', true);
+            codeReaderRef.current.hints = hints;
+
+            // オリジナル画像で検出
+            while (!result && attempts < maxAttempts) {
+              try {
+                if (attempts > 0) {
+                  context.save();
+                  context.translate(canvas.width / 2, canvas.height / 2);
+                  if (attempts <= 4) {
+                    context.rotate((Math.PI / 2) * attempts);
+                  }
+                  if (attempts > 4) {
+                    const scale = attempts === 5 ? 1.2 : attempts === 6 ? 0.8 : 1.5;
+                    context.scale(scale, scale);
+                  }
+                  context.drawImage(img, -width / 2, -height / 2, width, height);
+                  context.restore();
+                }
+                // ZXing
+                try {
+                  result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
+                  if (result) break;
+                } catch {}
+                // jsQR
+                try {
+                  const currentImageData = context.getImageData(0, 0, width, height);
+                  const jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
+                  if (jsQRResult) {
+                    result = {
+                      getText: () => jsQRResult.data,
+                      getBarcodeFormat: () => 'QR_CODE'
+                    };
+                    break;
+                  }
+                } catch {}
+              } catch {}
+              attempts++;
             }
-            context.putImageData(imageData, 0, 0);
 
-            try {
-              // 画像の品質を保持したままDataURLを生成
-              const dataUrl = canvas.toDataURL('image/png', 1.0);
-              let result = null;
-              let attempts = 0;
-              const maxAttempts = 8;
-
+            // オリジナルで失敗した場合のみグレースケール変換して再度試す
+            if (!result) {
+              const imageData = context.getImageData(0, 0, width, height);
+              const data = imageData.data;
+              for (let i = 0; i < data.length; i += 4) {
+                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                data[i] = avg; data[i + 1] = avg; data[i + 2] = avg;
+              }
+              context.putImageData(imageData, 0, 0);
+              dataUrl = canvas.toDataURL('image/png', 1.0);
+              attempts = 0;
               while (!result && attempts < maxAttempts) {
                 try {
-                  // 画像の回転とスケーリングを試行
                   if (attempts > 0) {
                     context.save();
                     context.translate(canvas.width / 2, canvas.height / 2);
@@ -270,96 +313,69 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     context.drawImage(img, -width / 2, -height / 2, width, height);
                     context.restore();
                   }
-
-                  // ZXingでの検出を試みる
+                  // ZXing
                   try {
                     result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
-                    if (result) {
-                      console.log('ZXingでコード検出成功:', {
-                        text: result.getText(),
-                        format: result.getBarcodeFormat(),
-                        timestamp: new Date().toISOString(),
-                        attempt: attempts + 1
-                      });
-                      break;
-                    }
-                  } catch (zxingError) {
-                    console.log('ZXingでの検出失敗:', zxingError);
-                  }
-
-                  // jsQRでの検出を試みる
+                    if (result) break;
+                  } catch {}
+                  // jsQR
                   try {
                     const currentImageData = context.getImageData(0, 0, width, height);
-                    const jsQRResult = jsQR(currentImageData.data, width, height, {
-                      inversionAttempts: "attemptBoth"
-                    });
-
+                    const jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
                     if (jsQRResult) {
-                      console.log('jsQRでコード検出成功:', {
-                        text: jsQRResult.data,
-                        timestamp: new Date().toISOString(),
-                        attempt: attempts + 1
-                      });
                       result = {
                         getText: () => jsQRResult.data,
                         getBarcodeFormat: () => 'QR_CODE'
                       };
                       break;
                     }
-                  } catch (jsQRError) {
-                    console.log('jsQRでの検出失敗:', jsQRError);
-                  }
-
-                } catch (err) {
-                  console.log(`試行 ${attempts + 1} 回目: 検出失敗`, err);
-                }
+                  } catch {}
+                } catch {}
                 attempts++;
               }
+            }
 
-              if (result) {
-                const code = result.getText();
-                console.log('画像から検出されたコード:', {
-                  text: code,
-                  format: result.getBarcodeFormat(),
-                  imageSize: { width, height },
-                  timestamp: new Date().toISOString()
-                });
+            // 結果処理は従来通り
+            if (result) {
+              const code = result.getText();
+              console.log('画像から検出されたコード:', {
+                text: code,
+                format: result.getBarcodeFormat(),
+                imageSize: { width, height },
+                timestamp: new Date().toISOString()
+              });
 
-                // 重複チェック
-                if (sessionScannedCodesRef.current.has(code)) {
-                  console.log('重複コードを検出 - 無視します:', code);
-                  return;
-                }
-
-                // 新しいコードの場合のみ処理を実行
-                sessionScannedCodesRef.current.add(code);
-
-                // 履歴に追加
-                setScannedCodes(prev => {
-                  const newSet = new Set(prev);
-                  newSet.add(code);
-                  return new Set(Array.from(newSet).slice(-10));
-                });
-
-                setLastScannedCodes(prev => {
-                  const newCodes = [...prev, code];
-                  return newCodes.slice(-5);
-                });
-
-                // コールバックを呼び出し
-                onScanSuccess(code);
-              } else {
-                console.log('画像からコードを検出できませんでした:', {
-                  attempts,
-                  imageSize: { width, height },
-                  timestamp: new Date().toISOString()
-                });
-                // エラーメッセージを表示
-                setCameraError('QRコードを検出できませんでした。画像の品質やQRコードの状態を確認してください。');
+              // 重複チェック
+              if (sessionScannedCodesRef.current.has(code)) {
+                console.log('重複コードを検出 - 無視します:', code);
+                return;
               }
-            } catch (error) {
-              console.error('画像からのコード読み取りエラー:', error);
-              setCameraError('QRコードの読み取り中にエラーが発生しました。');
+
+              // 新しいコードの場合のみ処理を実行
+              sessionScannedCodesRef.current.add(code);
+
+              // 履歴に追加
+              setScannedCodes(prev => {
+                const newSet = new Set(prev);
+                newSet.add(code);
+                return new Set(Array.from(newSet).slice(-10));
+              });
+
+              setLastScannedCodes(prev => {
+                const newCodes = [...prev, code];
+                return newCodes.slice(-5);
+              });
+
+              // コールバックを呼び出し
+              onScanSuccess(code);
+            } else {
+              console.log('画像からコードを検出できませんでした:', {
+                attempts,
+                imageSize: { width, height },
+                timestamp: new Date().toISOString()
+              });
+              // エラーメッセージを表示
+              setCameraError('QRコードを検出できませんでした。画像の品質やQRコードの状態を確認してください。');
             }
           }
         };
