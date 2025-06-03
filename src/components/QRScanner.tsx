@@ -413,7 +413,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               data[i] = data[i + 1] = data[i + 2] = contrasted;
             }
             context.putImageData(currentImageData, 0, 0);
-            let jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
+            const jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
             if (jsQRResult) {
               const code = jsQRResult.data;
               console.log('画像から検出されたコード（jsQR）:', {
