@@ -15,6 +15,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(true);
   const [scale, setScale] = useState(1);
+  const [duplicateMessage, setDuplicateMessage] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -30,6 +31,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     try {
       if (sessionScannedCodesRef.current.has(code)) {
         console.log('重複コードを検出 - 無視します:', code);
+        setDuplicateMessage('重複コードは無視されました');
+        setTimeout(() => setDuplicateMessage(''), 2000);
         return;
       }
       sessionScannedCodesRef.current.add(code);
@@ -376,6 +379,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               });
               if (sessionScannedCodesRef.current.has(code)) {
                 console.log('重複コードを検出 - 無視します:', code);
+                setDuplicateMessage('重複コードは無視されました');
+                setTimeout(() => setDuplicateMessage(''), 2000);
                 return;
               }
               sessionScannedCodesRef.current.add(code);
@@ -418,6 +423,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               });
               if (sessionScannedCodesRef.current.has(code)) {
                 console.log('重複コードを検出 - 無視します:', code);
+                setDuplicateMessage('重複コードは無視されました');
+                setTimeout(() => setDuplicateMessage(''), 2000);
                 return;
               }
               sessionScannedCodesRef.current.add(code);
@@ -481,7 +488,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             <video
               ref={videoRef}
               className="w-full h-full object-cover rounded-lg transition-transform duration-200"
-              style={{ transform: `scale(${scale})` }}
+              style={{ transform: `scale(${scale})`, objectFit: 'cover', willChange: 'transform', backfaceVisibility: 'hidden' }}
               playsInline
               muted
             />
@@ -501,6 +508,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               />
             </label>
           </div>
+          {duplicateMessage && (
+            <div className="p-2 bg-yellow-900 border border-yellow-700 rounded-lg text-yellow-300 mb-2 flex items-center justify-center">
+              {duplicateMessage}
+            </div>
+          )}
         </>
       )}
       <div className="mt-6 space-y-6">
