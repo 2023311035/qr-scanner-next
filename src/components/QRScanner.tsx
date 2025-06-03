@@ -188,7 +188,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 };
 
                 // jsQRのスキャンループを開始
-                const jsQRInterval = setInterval(scanWithJsQR, 100);
+                const jsQRInterval = setInterval(scanWithJsQR, 33);
 
                 // ZXingはバックアップとして設定
                 const hints = new Map();
@@ -400,21 +400,20 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               return;
             }
 
-            // ZXingで失敗した場合のみjsQRでQRコードを読む
+            // ZXingで失敗した場合はcanvasを元画像で再描画してからjsQRを呼ぶ
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(img, 0, 0, width, height);
             const currentImageData = context.getImageData(0, 0, width, height);
-            let jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
-            if (!jsQRResult) {
-              // グレースケール＋コントラスト強調
-              const data = currentImageData.data;
-              for (let i = 0; i < data.length; i += 4) {
-                const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                const contrast = 1.5;
-                const contrasted = Math.min(255, Math.max(0, (avg - 128) * contrast + 128));
-                data[i] = data[i + 1] = data[i + 2] = contrasted;
-              }
-              context.putImageData(currentImageData, 0, 0);
-              jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
+            // グレースケール＋コントラスト強調
+            const data = currentImageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+              const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+              const contrast = 2.0;
+              const contrasted = Math.min(255, Math.max(0, (avg - 128) * contrast + 128));
+              data[i] = data[i + 1] = data[i + 2] = contrasted;
             }
+            context.putImageData(currentImageData, 0, 0);
+            let jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
             if (jsQRResult) {
               const code = jsQRResult.data;
               console.log('画像から検出されたコード（jsQR）:', {
