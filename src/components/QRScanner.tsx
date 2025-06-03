@@ -376,30 +376,31 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             hints.set('CHARACTER_SET', 'UTF-8');
             codeReaderRef.current.hints = hints;
 
-            // ZXingで検出
+            // ZXingで検出（0°→180°のみ）
             let result = null;
-            let attempts = 0;
-            const maxAttempts = 8;
+            // 0°
+            context.save();
+            context.setTransform(1, 0, 0, 1, 0, 0); // リセット
+            context.clearRect(0, 0, canvas.width, canvas.height);
+            context.drawImage(img, 0, 0, width, height);
+            context.restore();
             const dataUrl = canvas.toDataURL('image/png', 1.0);
-            while (!result && attempts < maxAttempts) {
+            try {
+              result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
+            } catch {}
+
+            // 0°で失敗した場合のみ180°で再試行
+            if (!result) {
+              context.save();
+              context.clearRect(0, 0, canvas.width, canvas.height);
+              context.translate(canvas.width / 2, canvas.height / 2);
+              context.rotate(Math.PI); // 180°回転
+              context.drawImage(img, -width / 2, -height / 2, width, height);
+              context.restore();
+              const dataUrl180 = canvas.toDataURL('image/png', 1.0);
               try {
-                if (attempts > 0) {
-                  context.save();
-                  context.translate(canvas.width / 2, canvas.height / 2);
-                  if (attempts <= 4) {
-                    context.rotate((Math.PI / 2) * attempts);
-                  }
-                  if (attempts > 4) {
-                    const scale = attempts === 5 ? 1.2 : attempts === 6 ? 0.8 : 1.5;
-                    context.scale(scale, scale);
-                  }
-                  context.drawImage(img, -width / 2, -height / 2, width, height);
-                  context.restore();
-                }
-                result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
-                if (result) break;
+                result = await codeReaderRef.current.decodeFromImageUrl(dataUrl180);
               } catch {}
-              attempts++;
             }
 
             // 結果処理
@@ -429,7 +430,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               pauseScanning();
             } else {
               console.log('画像からコードを検出できませんでした:', {
-                attempts,
                 imageSize: { width, height },
                 timestamp: new Date().toISOString()
               });
