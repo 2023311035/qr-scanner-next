@@ -321,6 +321,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.imageSmoothingQuality = 'high';
             context.drawImage(img, 0, 0, width, height);
 
+            // === ここでcanvas内容を新しいタブで目視確認 ===
+            const debugDataUrl = canvas.toDataURL('image/png');
+            window.open(debugDataUrl);
+
             // ZXingのhintsを設定
             const hints = new Map();
             hints.set('TRY_HARDER', true);
