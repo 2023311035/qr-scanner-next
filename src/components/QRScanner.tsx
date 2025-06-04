@@ -30,9 +30,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     processingCodeRef.current = true;
     try {
       if (sessionScannedCodesRef.current.has(code)) {
-        console.log('重複コードを検出 - 無視します:', code);
-        setDuplicateMessage('重複コードは無視されました');
-        setTimeout(() => setDuplicateMessage(''), 2000);
         return;
       }
       sessionScannedCodesRef.current.add(code);
@@ -379,9 +376,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 timestamp: new Date().toISOString()
               });
               if (sessionScannedCodesRef.current.has(code)) {
-                console.log('重複コードを検出 - 無視します:', code);
-                setDuplicateMessage('重複コードは無視されました');
-                setTimeout(() => setDuplicateMessage(''), 2000);
                 return;
               }
               sessionScannedCodesRef.current.add(code);
@@ -423,9 +417,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 timestamp: new Date().toISOString()
               });
               if (sessionScannedCodesRef.current.has(code)) {
-                console.log('重複コードを検出 - 無視します:', code);
-                setDuplicateMessage('重複コードは無視されました');
-                setTimeout(() => setDuplicateMessage(''), 2000);
                 return;
               }
               sessionScannedCodesRef.current.add(code);
