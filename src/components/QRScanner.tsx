@@ -15,7 +15,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(true);
   const [scale, setScale] = useState(1);
-  const [duplicateMessage, setDuplicateMessage] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -501,70 +500,65 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               />
             </label>
           </div>
-          {duplicateMessage && (
-            <div className="p-2 bg-yellow-900 border border-yellow-700 rounded-lg text-yellow-300 mb-2 flex items-center justify-center">
-              {duplicateMessage}
+          <div className="mt-6 space-y-6">
+            {lastScannedCodes.length > 0 && (
+              <div className="p-4 bg-gray-800 border border-green-700 rounded-lg shadow-sm">
+                <h3 className="text-lg font-semibold mb-2 text-green-400">最新のスキャン結果:</h3>
+                <ul className="space-y-1">
+                  {[...lastScannedCodes].reverse().map((code, idx) => (
+                    <li key={idx}>
+                      {isValidUrl(code) ? (
+                        <a 
+                          href={code} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-400 hover:text-blue-300 break-all hover:underline"
+                        >
+                          {code}
+                        </a>
+                      ) : (
+                        <p className="break-all text-gray-300">{code}</p>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="bg-gray-800 p-4 rounded-lg shadow-sm">
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-lg font-semibold text-white">スキャン履歴:</h3>
+                <button
+                  onClick={() => {
+                    setScannedCodes(new Set());
+                    sessionScannedCodesRef.current = new Set();
+                  }}
+                  className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                >
+                  履歴をクリア
+                </button>
+              </div>
+              <ul className="space-y-2 max-h-[440px] overflow-y-auto pr-2">
+                {Array.from(scannedCodes).reverse().map((code, index) => (
+                  <li key={index} className="p-3 bg-gray-700 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200">
+                    {isValidUrl(code) ? (
+                      <a 
+                        href={code} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-400 hover:text-blue-300 break-all hover:underline"
+                      >
+                        {code}
+                      </a>
+                    ) : (
+                      <p className="break-all text-gray-300">{code}</p>
+                    )}
+                  </li>
+                ))}
+              </ul>
             </div>
-          )}
+          </div>
         </>
       )}
-      <div className="mt-6 space-y-6">
-        {lastScannedCodes.length > 0 && (
-          <div className="p-4 bg-gray-800 border border-green-700 rounded-lg shadow-sm">
-            <h3 className="text-lg font-semibold mb-2 text-green-400">最新のスキャン結果:</h3>
-            <ul className="space-y-1">
-              {[...lastScannedCodes].reverse().map((code, idx) => (
-                <li key={idx}>
-                  {isValidUrl(code) ? (
-                    <a 
-                      href={code} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 break-all hover:underline"
-                    >
-                      {code}
-                    </a>
-                  ) : (
-                    <p className="break-all text-gray-300">{code}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className="bg-gray-800 p-4 rounded-lg shadow-sm">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-lg font-semibold text-white">スキャン履歴:</h3>
-            <button
-              onClick={() => {
-                setScannedCodes(new Set());
-                sessionScannedCodesRef.current = new Set();
-              }}
-              className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
-            >
-              履歴をクリア
-            </button>
-          </div>
-          <ul className="space-y-2 max-h-[440px] overflow-y-auto pr-2">
-            {Array.from(scannedCodes).reverse().map((code, index) => (
-              <li key={index} className="p-3 bg-gray-700 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200">
-                {isValidUrl(code) ? (
-                  <a 
-                    href={code} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 break-all hover:underline"
-                  >
-                    {code}
-                  </a>
-                ) : (
-                  <p className="break-all text-gray-300">{code}</p>
-                )}
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
     </div>
   );
 } 
