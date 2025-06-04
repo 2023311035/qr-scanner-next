@@ -252,7 +252,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         clearTimeout(scanTimeoutRef.current);
       }
     };
-  }, [onScanSuccess, isScanning, processScannedCode]);
+  }, [onScanSuccess, processScannedCode]);
 
   useEffect(() => {
     const video = videoRef.current;
