@@ -97,7 +97,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       try {
         setIsInitializing(true);
         setCameraError('');
-        sessionScannedCodesRef.current = new Set();
+        sessionScannedCodesRef.current = new Set(); // カメラ初期化時のみ
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
@@ -530,7 +530,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 <button
                   onClick={() => {
                     setScannedCodes(new Set());
-                    sessionScannedCodesRef.current = new Set();
+                    sessionScannedCodesRef.current = new Set(); // 履歴クリア時のみ
                   }}
                   className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
                 >
