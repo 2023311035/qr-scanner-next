@@ -315,6 +315,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               }
             }
 
+            // ★canvasのサイズをimgのピクセルサイズに必ず合わせる
             canvas.width = width;
             canvas.height = height;
 
@@ -323,93 +324,21 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.imageSmoothingQuality = 'high';
             context.drawImage(img, 0, 0, width, height);
 
-            // === ここでcanvas内容を新しいタブで目視確認 ===
-            const debugDataUrl = canvas.toDataURL('image/png');
-            window.open(debugDataUrl);
+            // ★canvas内容を目視確認
+            window.open(canvas.toDataURL('image/png'));
 
-            // ZXingのhintsを設定
-            const hints = new Map();
-            hints.set('TRY_HARDER', true);
-            hints.set('POSSIBLE_FORMATS', [
-              'QR_CODE',
-              'EAN_13',
-              'EAN_8',
-              'UPC_A',
-              'UPC_E',
-              'CODE_39',
-              'CODE_93',
-              'CODE_128',
-              'ITF',
-              'CODABAR'
-            ]);
-            hints.set('CHARACTER_SET', 'UTF-8');
-            if (!codeReaderRef.current) return;
-            codeReaderRef.current.hints = hints;
-
-            // ZXingで検出（0°→180°のみ）
-            let result = null;
-            context.save();
-            context.setTransform(1, 0, 0, 1, 0, 0); // リセット
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            context.drawImage(img, 0, 0, width, height);
-            context.restore();
-            const dataUrl = canvas.toDataURL('image/png', 1.0);
-            try {
-              result = await codeReaderRef.current.decodeFromImageUrl(dataUrl);
-            } catch {}
-            if (!result) {
-              context.save();
-              context.clearRect(0, 0, canvas.width, canvas.height);
-              context.translate(canvas.width / 2, canvas.height / 2);
-              context.rotate(Math.PI); // 180°回転
-              context.drawImage(img, -width / 2, -height / 2, width, height);
-              context.restore();
-              const dataUrl180 = canvas.toDataURL('image/png', 1.0);
-              try {
-                result = await codeReaderRef.current.decodeFromImageUrl(dataUrl180);
-              } catch {}
-            }
-            if (result) {
-              const code = result.getText();
-              console.log('画像から検出されたコード（ZXing）:', {
-                text: code,
-                format: result.getBarcodeFormat(),
-                imageSize: { width, height },
-                timestamp: new Date().toISOString()
-              });
-              if (sessionScannedCodesRef.current.has(code)) {
-                return;
-              }
-              sessionScannedCodesRef.current.add(code);
-              setScannedCodes(prev => {
-                const newSet = new Set(prev);
-                newSet.add(code);
-                return new Set(Array.from(newSet).slice(-10));
-              });
-              setLastScannedCodes(prev => {
-                if (prev.includes(code)) return prev;
-                const newCodes = [...prev, code];
-                return newCodes.slice(-5);
-              });
-              onScanSuccess(code);
-              pauseScanning();
-              return;
-            }
-
-            // ZXingで失敗した場合はcanvasを元画像で再描画してからjsQRを呼ぶ
-            context.clearRect(0, 0, canvas.width, canvas.height);
-            context.drawImage(img, 0, 0, width, height);
-            const currentImageData = context.getImageData(0, 0, width, height);
-            // グレースケール＋コントラスト強調
-            const data = currentImageData.data;
-            for (let i = 0; i < data.length; i += 4) {
-              const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            // jsQRの前処理（グレースケール＋コントラスト強調）
+            const imageData = context.getImageData(0, 0, width, height);
+            for (let i = 0; i < imageData.data.length; i += 4) {
+              const avg = (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
               const contrast = 2.0;
               const contrasted = Math.min(255, Math.max(0, (avg - 128) * contrast + 128));
-              data[i] = data[i + 1] = data[i + 2] = contrasted;
+              imageData.data[i] = imageData.data[i + 1] = imageData.data[i + 2] = contrasted;
             }
-            context.putImageData(currentImageData, 0, 0);
-            const jsQRResult = jsQR(currentImageData.data, width, height, { inversionAttempts: "attemptBoth" });
+            context.putImageData(imageData, 0, 0);
+
+            // ★jsQRは必ず元画像で呼ぶ
+            const jsQRResult = jsQR(imageData.data, width, height, { inversionAttempts: "attemptBoth" });
             if (jsQRResult) {
               const code = jsQRResult.data;
               console.log('画像から検出されたコード（jsQR）:', {
