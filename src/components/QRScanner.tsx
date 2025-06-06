@@ -327,7 +327,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             // ★canvas内容を目視確認
             window.open(canvas.toDataURL('image/png'));
 
-            // jsQRの前処理（グレースケール＋コントラスト強調）
+            // --- QRコード用: グレースケール＋コントラスト強調したImageDataでjsQR ---
             const imageData = context.getImageData(0, 0, width, height);
             for (let i = 0; i < imageData.data.length; i += 4) {
               const avg = (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
@@ -335,9 +335,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               const contrasted = Math.min(255, Math.max(0, (avg - 128) * contrast + 128));
               imageData.data[i] = imageData.data[i + 1] = imageData.data[i + 2] = contrasted;
             }
-            context.putImageData(imageData, 0, 0);
-
-            // ★jsQRは必ず元画像で呼ぶ
+            // jsQRは加工後ImageDataで呼ぶ
             const jsQRResult = jsQR(imageData.data, width, height, { inversionAttempts: "attemptBoth" });
             if (jsQRResult) {
               const code = jsQRResult.data;
@@ -364,6 +362,40 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               onScanSuccess(code);
               pauseScanning();
               return;
+            }
+
+            // --- バーコード用: 元画像のままcanvasを再描画してZXing ---
+            context.drawImage(img, 0, 0, width, height); // 元画像で上書き
+            try {
+              const result = await codeReaderRef.current.decodeFromImageUrl(canvas.toDataURL());
+              if (result) {
+                const code = result.getText();
+                console.log('画像から検出されたコード（ZXing）:', {
+                  text: code,
+                  format: result.getBarcodeFormat(),
+                  imageSize: { width, height },
+                  timestamp: new Date().toISOString()
+                });
+                if (sessionScannedCodesRef.current.has(code)) {
+                  return;
+                }
+                sessionScannedCodesRef.current.add(code);
+                setScannedCodes(prev => {
+                  const newSet = new Set(prev);
+                  newSet.add(code);
+                  return new Set(Array.from(newSet).slice(-10));
+                });
+                setLastScannedCodes(prev => {
+                  if (prev.includes(code)) return prev;
+                  const newCodes = [...prev, code];
+                  return newCodes.slice(-5);
+                });
+                onScanSuccess(code);
+                pauseScanning();
+                return;
+              }
+            } catch (err) {
+              console.log('ZXingによる画像デコード失敗:', err);
             }
           }
         };
