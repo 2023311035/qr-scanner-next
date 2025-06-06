@@ -22,6 +22,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTouchDistanceRef = useRef<number | null>(null);
   const processingCodeRef = useRef<boolean>(false);
+  const [isImageMode, setIsImageMode] = useState(false);
 
   // コード処理を一元化する関数
   const processScannedCode = useCallback((code: string) => {
@@ -98,6 +99,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         setIsInitializing(true);
         setCameraError('');
         sessionScannedCodesRef.current = new Set(); // カメラ初期化時のみ
+        setIsImageMode(false); // カメラ起動時は画像モード解除
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
@@ -148,32 +150,31 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
           // バーコードスキャンの開始
           const scanCode = async () => {
-            if (video && codeReaderRef.current) {
+            if ((video && codeReaderRef.current) || isImageMode) {
               try {
                 console.log('スキャン開始...');
                 // jsQRの設定
                 const scanWithJsQR = () => {
-                  if (!video || !canvasRef.current || !isScanning) return;
-                  
+                  if ((!video && !isImageMode) || !canvasRef.current || !isScanning) return;
                   const canvas = canvasRef.current;
                   const context = canvas.getContext('2d');
                   if (!context) return;
-
-                  // キャンバスのサイズをビデオに合わせる
-                  canvas.width = video.videoWidth;
-                  canvas.height = video.videoHeight;
-                  
-                  // ビデオフレームをキャンバスに描画
-                  context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                  
-                  // 画像データを取得
-                  const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
-                  
-                  // jsQRでスキャン
+                  let width, height;
+                  if (isImageMode) {
+                    width = canvas.width;
+                    height = canvas.height;
+                  } else {
+                    if (!video) return;
+                    width = video.videoWidth;
+                    height = video.videoHeight;
+                    canvas.width = width;
+                    canvas.height = height;
+                    context.drawImage(video, 0, 0, width, height);
+                  }
+                  const imageData = context.getImageData(0, 0, width, height);
                   const code = jsQR(imageData.data, imageData.width, imageData.height, {
                     inversionAttempts: "dontInvert",
                   });
-
                   if (code) {
                     console.log('jsQRで検出されたコード:', {
                       text: code.data,
@@ -182,8 +183,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     processScannedCode(code.data);
                   }
                 };
-
-                // jsQRのスキャンループを開始
                 const jsQRInterval = setInterval(scanWithJsQR, 33);
 
                 // ZXingはバックアップとして設定
@@ -191,32 +190,34 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 hints.set('TRY_HARDER', true);
                 hints.set('POSSIBLE_FORMATS', ['QR_CODE']);
                 hints.set('CHARACTER_SET', 'UTF-8');
+                if (!codeReaderRef.current) return;
                 codeReaderRef.current.hints = hints;
 
-                await codeReaderRef.current.decodeFromVideoDevice(
-                  undefined,
-                  video,
-                  (result, error) => {
-                    if (error) {
-                      console.error('ZXingスキャンエラー:', error);
-                      return;
+                if (video) {
+                  await codeReaderRef.current.decodeFromVideoDevice(
+                    undefined,
+                    video,
+                    (result, error) => {
+                      if (error) {
+                        console.error('ZXingスキャンエラー:', error);
+                        return;
+                      }
+                      if (result && isScanning) {
+                        const code = result.getText();
+                        console.log('ZXingで検出されたコード:', {
+                          text: code,
+                          format: result.getBarcodeFormat()
+                        });
+                        processScannedCode(code);
+                      }
                     }
-                    if (result && isScanning) {
-                      const code = result.getText();
-                      console.log('ZXingで検出されたコード:', {
-                        text: code,
-                        format: result.getBarcodeFormat()
-                      });
-                      processScannedCode(code);
-                    }
-                  }
-                );
+                  );
+                }
 
                 // クリーンアップ関数
                 return () => {
                   clearInterval(jsQRInterval);
                   if (codeReaderRef.current) {
-                    // ZXingのクリーンアップ
                     codeReaderRef.current = null;
                   }
                 };
@@ -272,6 +273,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    setIsImageMode(true);
 
     try {
       // ZXingの初期化を確認
@@ -341,6 +343,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               'CODABAR'
             ]);
             hints.set('CHARACTER_SET', 'UTF-8');
+            if (!codeReaderRef.current) return;
             codeReaderRef.current.hints = hints;
 
             // ZXingで検出（0°→180°のみ）
