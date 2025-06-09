@@ -253,7 +253,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                             Math.min(height - y + padding, h + padding * 2)
                           );
                         }
-                      } catch (error) {
+                      } catch {
                         break;
                       }
                     }
@@ -301,8 +301,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const stream = video.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
-      if (scanTimeoutRef.current) {
-        clearTimeout(scanTimeoutRef.current);
+      const timeoutRef = scanTimeoutRef.current;
+      if (timeoutRef) {
+        clearTimeout(timeoutRef);
       }
     };
   }, [isImageMode, processScannedCode]);
