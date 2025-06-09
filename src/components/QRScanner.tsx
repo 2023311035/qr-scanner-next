@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
 import jsQR from 'jsqr';
 
 interface QRScannerProps {
@@ -214,40 +214,89 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 // ZXingはバックアップとして設定
                 const hints = new Map();
                 hints.set('TRY_HARDER', true);
-                hints.set('POSSIBLE_FORMATS', ['QR_CODE']);
+                hints.set('POSSIBLE_FORMATS', ['QR_CODE', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_39', 'CODE_93', 'CODE_128', 'ITF', 'CODABAR']);
                 hints.set('CHARACTER_SET', 'UTF-8');
-                hints.set('MULTI', true); // 複数コードの読み取りを有効化
+                hints.set('MULTI', true);
                 if (!codeReaderRef.current) return;
                 codeReaderRef.current.hints = hints;
 
                 if (video) {
-                  await codeReaderRef.current.decodeFromVideoDevice(
-                    undefined,
-                    video,
-                    (result, error) => {
-                      if (error) {
-                        console.error('ZXingスキャンエラー:', error);
-                        return;
-                      }
-                      if (result && isScanning) {
+                  const scanWithZXing = async () => {
+                    if (!video || !canvasRef.current || !isScanning) return;
+                    const canvas = canvasRef.current;
+                    const context = canvas.getContext('2d');
+                    if (!context) return;
+
+                    // ビデオフレームをキャンバスに描画
+                    const width = video.videoWidth;
+                    const height = video.videoHeight;
+                    canvas.width = width;
+                    canvas.height = height;
+                    context.drawImage(video, 0, 0, width, height);
+
+                    // 複数のバーコードを検出
+                    const codes: Array<{ code: string; format: BarcodeFormat; points: { x: number; y: number }[] }> = [];
+
+                    while (true) {
+                      try {
+                        const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
+                        if (!result) break;
+
                         const code = result.getText();
-                        console.log('ZXingで検出されたコード:', {
-                          text: code,
-                          format: result.getBarcodeFormat()
-                        });
-                        processScannedCode(code);
+                        const format = result.getBarcodeFormat();
+                        // @ts-ignore
+                        const points = result.getResultPoints().map((point: any) => ({
+                          x: point.getX(),
+                          y: point.getY()
+                        }));
+
+                        // 検出したコードを保存
+                        codes.push({ code, format, points });
+
+                        // 検出済みの領域をマスク
+                        if (points.length >= 4) {
+                          const x = Math.min(...points.map((p: { x: number; y: number }) => p.x));
+                          const y = Math.min(...points.map((p: { x: number; y: number }) => p.y));
+                          const w = Math.max(...points.map((p: { x: number; y: number }) => p.x)) - x;
+                          const h = Math.max(...points.map((p: { x: number; y: number }) => p.y)) - y;
+
+                          // マスク領域を白で塗りつぶし（余白を追加）
+                          const padding = 10;
+                          context.fillStyle = 'white';
+                          context.fillRect(
+                            Math.max(0, x - padding),
+                            Math.max(0, y - padding),
+                            Math.min(width - x + padding, w + padding * 2),
+                            Math.min(height - y + padding, h + padding * 2)
+                          );
+                        }
+                      } catch (error) {
+                        console.error('バーコード検出エラー:', error);
+                        break;
                       }
                     }
-                  );
-                }
 
-                // クリーンアップ関数
-                return () => {
-                  clearInterval(jsQRInterval);
-                  if (codeReaderRef.current) {
-                    codeReaderRef.current = null;
-                  }
-                };
+                    // 検出したコードを処理
+                    codes.forEach(({ code, format }) => {
+                      console.log('ZXingで検出されたコード:', {
+                        text: code,
+                        format: format
+                      });
+                      processScannedCode(code);
+                    });
+                  };
+
+                  // 定期的にスキャン実行
+                  const zxingInterval = setInterval(scanWithZXing, 33);
+
+                  // クリーンアップ関数
+                  return () => {
+                    clearInterval(zxingInterval);
+                    if (codeReaderRef.current) {
+                      codeReaderRef.current = null;
+                    }
+                  };
+                }
 
               } catch (error) {
                 console.error('スキャンエラー:', error);
