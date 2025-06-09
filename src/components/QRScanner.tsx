@@ -220,8 +220,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   });
                 };
 
-                // 定期的にスキャン実行
-                const jsQRInterval = setInterval(scanWithJsQR, 33);
+                // 定期的にスキャン実行（間隔を100msに変更）
+                const jsQRInterval = setInterval(scanWithJsQR, 100);
 
                 // ZXingはバックアップとして設定
                 const hints = new Map();
@@ -297,8 +297,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     });
                   };
 
-                  // 定期的にスキャン実行
-                  const zxingInterval = setInterval(scanWithZXing, 33);
+                  // 定期的にスキャン実行（間隔を100msに変更）
+                  const zxingInterval = setInterval(scanWithZXing, 100);
 
                   // クリーンアップ関数
                   return () => {
