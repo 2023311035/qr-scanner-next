@@ -261,7 +261,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     scanWithZXing();
                   }
                   isJsQR = !isJsQR;
-                }, 500);
+                }, 1000);
 
                 return () => {
                   clearInterval(scanInterval);
