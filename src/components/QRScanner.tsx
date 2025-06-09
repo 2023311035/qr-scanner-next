@@ -53,7 +53,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         return newCodes.slice(-5);
       });
       onScanSuccess(code);
-      pauseScanning();
     } finally {
       processingCodeRef.current = false;
     }
@@ -64,9 +63,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     if (scanTimeoutRef.current) {
       clearTimeout(scanTimeoutRef.current);
     }
-    scanTimeoutRef.current = setTimeout(() => {
-      // スキャン再開の処理は不要なので削除
-    }, 1000);
   };
 
   // ピンチズームの処理をuseCallbackでラップ
@@ -106,8 +102,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       try {
         setIsInitializing(true);
         setCameraError('');
-        sessionScannedCodesRef.current = new Set(); // カメラ初期化時のみ
-        setIsImageMode(false); // カメラ起動時は画像モード解除
+        sessionScannedCodesRef.current = new Set();
+        setIsImageMode(false);
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
@@ -115,7 +111,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           return;
         }
 
-        // 利用可能なカメラデバイスを確認
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
         console.log('利用可能なカメラデバイス:', videoDevices);
@@ -126,20 +121,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           return;
         }
 
-        // ZXingの初期化
         try {
           console.log('ZXing初期化開始');
           const codeReader = new BrowserMultiFormatReader();
           codeReaderRef.current = codeReader;
 
-          // カメラストリームの取得（高解像度設定）
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { min: 1920, ideal: 1920, max: 3840 },
-              height: { min: 1080, ideal: 1080, max: 2160 },
-              frameRate: { min: 30, ideal: 60, max: 120 },
-              aspectRatio: { ideal: 1.777777778 }
+              width: { min: 1280, ideal: 1920, max: 1920 },
+              height: { min: 720, ideal: 1080, max: 1080 },
+              frameRate: { min: 30, ideal: 30, max: 30 }
             }
           });
 
@@ -156,12 +148,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             });
           }
 
-          // バーコードスキャンの開始
           const scanCode = async () => {
             if ((video && codeReaderRef.current) || isImageMode) {
               try {
                 console.log('スキャン開始...');
-                // jsQRの設定
                 const scanWithJsQR = () => {
                   if ((!video && !isImageMode) || !canvasRef.current) return;
                   const canvas = canvasRef.current;
@@ -181,7 +171,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   }
                   const imageData = context.getImageData(0, 0, width, height);
                   
-                  // 複数のQRコードを検出
                   const codes = [];
                   
                   while (true) {
@@ -191,37 +180,27 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     
                     if (!code) break;
                     
-                    // 検出したコードを保存
                     codes.push(code.data);
                     
-                    // 検出済みの領域をマスク
                     const { topLeftCorner, topRightCorner, bottomLeftCorner, bottomRightCorner } = code.location;
                     const x = Math.min(topLeftCorner.x, bottomLeftCorner.x);
                     const y = Math.min(topLeftCorner.y, topRightCorner.y);
                     const w = Math.max(topRightCorner.x, bottomRightCorner.x) - x;
                     const h = Math.max(bottomLeftCorner.y, bottomRightCorner.y) - y;
                     
-                    // マスク領域を白で塗りつぶし
                     context.fillStyle = 'white';
                     context.fillRect(x, y, w, h);
                     const newImageData = context.getImageData(0, 0, width, height);
                     imageData.data.set(newImageData.data);
                   }
                   
-                  // 検出したコードを処理
                   codes.forEach(code => {
-                    console.log('jsQRで検出されたコード:', {
-                      text: code,
-                      format: 'QR_CODE'
-                    });
                     processScannedCode(code);
                   });
                 };
 
-                // 定期的にスキャン実行（間隔を100msに変更）
-                const jsQRInterval = setInterval(scanWithJsQR, 100);
+                const jsQRInterval = setInterval(scanWithJsQR, 200);
 
-                // ZXingはバックアップとして設定
                 const hints = new Map();
                 hints.set('TRY_HARDER', true);
                 hints.set('POSSIBLE_FORMATS', ['QR_CODE', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_39', 'CODE_93', 'CODE_128', 'ITF', 'CODABAR']);
@@ -237,14 +216,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     const context = canvas.getContext('2d');
                     if (!context) return;
 
-                    // ビデオフレームをキャンバスに描画
                     const width = video.videoWidth;
                     const height = video.videoHeight;
                     canvas.width = width;
                     canvas.height = height;
                     context.drawImage(video, 0, 0, width, height);
 
-                    // 複数のバーコードを検出
                     const codes: Array<{ code: string; format: BarcodeFormat; points: { x: number; y: number }[] }> = [];
 
                     while (true) {
@@ -259,17 +236,14 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                           y: point.getY()
                         }));
 
-                        // 検出したコードを保存
                         codes.push({ code, format, points });
 
-                        // 検出済みの領域をマスク
                         if (points.length >= 4) {
                           const x = Math.min(...points.map((p: { x: number; y: number }) => p.x));
                           const y = Math.min(...points.map((p: { x: number; y: number }) => p.y));
                           const w = Math.max(...points.map((p: { x: number; y: number }) => p.x)) - x;
                           const h = Math.max(...points.map((p: { x: number; y: number }) => p.y)) - y;
 
-                          // マスク領域を白で塗りつぶし（余白を追加）
                           const padding = 10;
                           context.fillStyle = 'white';
                           context.fillRect(
@@ -280,25 +254,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                           );
                         }
                       } catch (error) {
-                        console.error('バーコード検出エラー:', error);
                         break;
                       }
                     }
 
-                    // 検出したコードを処理
-                    codes.forEach(({ code, format }) => {
-                      console.log('ZXingで検出されたコード:', {
-                        text: code,
-                        format: format
-                      });
+                    codes.forEach(({ code }) => {
                       processScannedCode(code);
                     });
                   };
 
-                  // 定期的にスキャン実行（間隔を100msに変更）
-                  const zxingInterval = setInterval(scanWithZXing, 100);
+                  const zxingInterval = setInterval(scanWithZXing, 200);
 
-                  // クリーンアップ関数
                   return () => {
                     clearInterval(jsQRInterval);
                     clearInterval(zxingInterval);
