@@ -174,8 +174,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   const imageData = context.getImageData(0, 0, width, height);
                   
                   // 複数のQRコードを検出
-                  let codes = [];
-                  let lastLocation = null;
+                  const codes = [];
                   
                   while (true) {
                     const code = jsQR(imageData.data, imageData.width, imageData.height, {
@@ -186,7 +185,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     
                     // 検出したコードを保存
                     codes.push(code.data);
-                    lastLocation = code.location;
                     
                     // 検出済みの領域をマスク
                     const { topLeftCorner, topRightCorner, bottomLeftCorner, bottomRightCorner } = code.location;
@@ -282,7 +280,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         clearTimeout(scanTimeoutRef.current);
       }
     };
-  }, []);
+  }, [isImageMode, isScanning, processScannedCode]);
 
   useEffect(() => {
     const video = videoRef.current;
