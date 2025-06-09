@@ -155,7 +155,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 const scanWithJsQR = () => {
                   if ((!video && !isImageMode) || !canvasRef.current) return;
                   const canvas = canvasRef.current;
-                  const context = canvas.getContext('2d');
+                  const context = canvas.getContext('2d', { alpha: false });
                   if (!context) return;
                   let width, height;
                   if (isImageMode) {
@@ -199,81 +199,76 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   });
                 };
 
-                const jsQRInterval = setInterval(scanWithJsQR, 500);
+                const scanWithZXing = async () => {
+                  if (!video || !canvasRef.current) return;
+                  const canvas = canvasRef.current;
+                  const context = canvas.getContext('2d', { alpha: false });
+                  if (!context) return;
 
-                const hints = new Map();
-                hints.set('TRY_HARDER', true);
-                hints.set('POSSIBLE_FORMATS', ['QR_CODE', 'EAN_13', 'EAN_8', 'UPC_A', 'UPC_E', 'CODE_39', 'CODE_93', 'CODE_128', 'ITF', 'CODABAR']);
-                hints.set('CHARACTER_SET', 'UTF-8');
-                hints.set('MULTI', true);
-                if (!codeReaderRef.current) return;
-                codeReaderRef.current.hints = hints;
+                  const width = video.videoWidth;
+                  const height = video.videoHeight;
+                  canvas.width = width;
+                  canvas.height = height;
+                  context.drawImage(video, 0, 0, width, height);
 
-                if (video) {
-                  const scanWithZXing = async () => {
-                    if (!video || !canvasRef.current) return;
-                    const canvas = canvasRef.current;
-                    const context = canvas.getContext('2d');
-                    if (!context) return;
+                  const codes: Array<{ code: string; format: BarcodeFormat; points: { x: number; y: number }[] }> = [];
 
-                    const width = video.videoWidth;
-                    const height = video.videoHeight;
-                    canvas.width = width;
-                    canvas.height = height;
-                    context.drawImage(video, 0, 0, width, height);
+                  while (true) {
+                    try {
+                      const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
+                      if (!result) break;
 
-                    const codes: Array<{ code: string; format: BarcodeFormat; points: { x: number; y: number }[] }> = [];
+                      const code = result.getText();
+                      const format = result.getBarcodeFormat();
+                      const points = (result as ZXingResult).getResultPoints().map((point: { getX: () => number; getY: () => number }) => ({
+                        x: point.getX(),
+                        y: point.getY()
+                      }));
 
-                    while (true) {
-                      try {
-                        const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
-                        if (!result) break;
+                      codes.push({ code, format, points });
 
-                        const code = result.getText();
-                        const format = result.getBarcodeFormat();
-                        const points = (result as ZXingResult).getResultPoints().map((point: { getX: () => number; getY: () => number }) => ({
-                          x: point.getX(),
-                          y: point.getY()
-                        }));
+                      if (points.length >= 4) {
+                        const x = Math.min(...points.map((p: { x: number; y: number }) => p.x));
+                        const y = Math.min(...points.map((p: { x: number; y: number }) => p.y));
+                        const w = Math.max(...points.map((p: { x: number; y: number }) => p.x)) - x;
+                        const h = Math.max(...points.map((p: { x: number; y: number }) => p.y)) - y;
 
-                        codes.push({ code, format, points });
-
-                        if (points.length >= 4) {
-                          const x = Math.min(...points.map((p: { x: number; y: number }) => p.x));
-                          const y = Math.min(...points.map((p: { x: number; y: number }) => p.y));
-                          const w = Math.max(...points.map((p: { x: number; y: number }) => p.x)) - x;
-                          const h = Math.max(...points.map((p: { x: number; y: number }) => p.y)) - y;
-
-                          const padding = 10;
-                          context.fillStyle = 'white';
-                          context.fillRect(
-                            Math.max(0, x - padding),
-                            Math.max(0, y - padding),
-                            Math.min(width - x + padding, w + padding * 2),
-                            Math.min(height - y + padding, h + padding * 2)
-                          );
-                        }
-                      } catch {
-                        break;
+                        const padding = 10;
+                        context.fillStyle = 'white';
+                        context.fillRect(
+                          Math.max(0, x - padding),
+                          Math.max(0, y - padding),
+                          Math.min(width - x + padding, w + padding * 2),
+                          Math.min(height - y + padding, h + padding * 2)
+                        );
                       }
+                    } catch {
+                      break;
                     }
+                  }
 
-                    codes.forEach(({ code }) => {
-                      processScannedCode(code);
-                    });
-                  };
+                  codes.forEach(({ code }) => {
+                    processScannedCode(code);
+                  });
+                };
 
-                  const zxingInterval = setInterval(scanWithZXing, 500);
+                // jsQRとZXingを交互に実行
+                let isJsQR = true;
+                const scanInterval = setInterval(() => {
+                  if (isJsQR) {
+                    scanWithJsQR();
+                  } else {
+                    scanWithZXing();
+                  }
+                  isJsQR = !isJsQR;
+                }, 500);
 
-                  return () => {
-                    clearInterval(jsQRInterval);
-                    clearInterval(zxingInterval);
-                    if (codeReaderRef.current) {
-                      codeReaderRef.current = null;
-                    }
-                  };
-                }
-
+                return () => {
+                  clearInterval(scanInterval);
+                  if (codeReaderRef.current) {
+                    codeReaderRef.current = null;
+                  }
+                };
               } catch (error) {
                 console.error('スキャンエラー:', error);
               }
