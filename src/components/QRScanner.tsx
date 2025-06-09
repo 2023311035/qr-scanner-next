@@ -23,7 +23,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
-  const [isScanning, setIsScanning] = useState(true);
   const [scale, setScale] = useState(1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -164,7 +163,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 console.log('スキャン開始...');
                 // jsQRの設定
                 const scanWithJsQR = () => {
-                  if ((!video && !isImageMode) || !canvasRef.current || !isScanning) return;
+                  if ((!video && !isImageMode) || !canvasRef.current) return;
                   const canvas = canvasRef.current;
                   const context = canvas.getContext('2d');
                   if (!context) return;
@@ -233,7 +232,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
                 if (video) {
                   const scanWithZXing = async () => {
-                    if (!video || !canvasRef.current || !isScanning) return;
+                    if (!video || !canvasRef.current) return;
                     const canvas = canvasRef.current;
                     const context = canvas.getContext('2d');
                     if (!context) return;
@@ -340,7 +339,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         clearTimeout(scanTimeoutRef.current);
       }
     };
-  }, [isImageMode, isScanning, processScannedCode]);
+  }, [isImageMode, processScannedCode]);
 
   useEffect(() => {
     const video = videoRef.current;
