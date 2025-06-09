@@ -62,12 +62,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
   // スキャン処理を一時停止する関数
   const pauseScanning = () => {
-    setIsScanning(false);
     if (scanTimeoutRef.current) {
       clearTimeout(scanTimeoutRef.current);
     }
     scanTimeoutRef.current = setTimeout(() => {
-      setIsScanning(true);
+      // スキャン再開の処理は不要なので削除
     }, 1000);
   };
 
