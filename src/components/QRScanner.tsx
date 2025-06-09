@@ -4,6 +4,16 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
 import jsQR from 'jsqr';
 
+// ZXingの型定義
+interface ZXingResult {
+  getText: () => string;
+  getBarcodeFormat: () => BarcodeFormat;
+  getResultPoints: () => Array<{
+    getX: () => number;
+    getY: () => number;
+  }>;
+}
+
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
 }
@@ -246,7 +256,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
                         const code = result.getText();
                         const format = result.getBarcodeFormat();
-                        const points = (result as any).getResultPoints().map((point: { getX: () => number; getY: () => number }) => ({
+                        const points = (result as ZXingResult).getResultPoints().map((point: { getX: () => number; getY: () => number }) => ({
                           x: point.getX(),
                           y: point.getY()
                         }));
