@@ -172,16 +172,44 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     context.drawImage(video, 0, 0, width, height);
                   }
                   const imageData = context.getImageData(0, 0, width, height);
-                  const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                    inversionAttempts: "dontInvert",
-                  });
-                  if (code) {
+                  
+                  // 複数のQRコードを検出
+                  let codes = [];
+                  let lastLocation = null;
+                  
+                  while (true) {
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                      inversionAttempts: "dontInvert"
+                    });
+                    
+                    if (!code) break;
+                    
+                    // 検出したコードを保存
+                    codes.push(code.data);
+                    lastLocation = code.location;
+                    
+                    // 検出済みの領域をマスク
+                    const { topLeftCorner, topRightCorner, bottomLeftCorner, bottomRightCorner } = code.location;
+                    const x = Math.min(topLeftCorner.x, bottomLeftCorner.x);
+                    const y = Math.min(topLeftCorner.y, topRightCorner.y);
+                    const w = Math.max(topRightCorner.x, bottomRightCorner.x) - x;
+                    const h = Math.max(bottomLeftCorner.y, bottomRightCorner.y) - y;
+                    
+                    // マスク領域を白で塗りつぶし
+                    context.fillStyle = 'white';
+                    context.fillRect(x, y, w, h);
+                    const newImageData = context.getImageData(0, 0, width, height);
+                    imageData.data.set(newImageData.data);
+                  }
+                  
+                  // 検出したコードを処理
+                  codes.forEach(code => {
                     console.log('jsQRで検出されたコード:', {
-                      text: code.data,
+                      text: code,
                       format: 'QR_CODE'
                     });
-                    processScannedCode(code.data);
-                  }
+                    processScannedCode(code);
+                  });
                 };
                 const jsQRInterval = setInterval(scanWithJsQR, 33);
 
@@ -190,6 +218,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 hints.set('TRY_HARDER', true);
                 hints.set('POSSIBLE_FORMATS', ['QR_CODE']);
                 hints.set('CHARACTER_SET', 'UTF-8');
+                hints.set('MULTI', true); // 複数コードの読み取りを有効化
                 if (!codeReaderRef.current) return;
                 codeReaderRef.current.hints = hints;
 
