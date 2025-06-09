@@ -209,6 +209,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     processScannedCode(code);
                   });
                 };
+
+                // 定期的にスキャン実行
                 const jsQRInterval = setInterval(scanWithJsQR, 33);
 
                 // ZXingはバックアップとして設定
@@ -244,8 +246,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
                         const code = result.getText();
                         const format = result.getBarcodeFormat();
-                        // @ts-ignore
-                        const points = result.getResultPoints().map((point: any) => ({
+                        const points = (result as any).getResultPoints().map((point: { getX: () => number; getY: () => number }) => ({
                           x: point.getX(),
                           y: point.getY()
                         }));
@@ -291,6 +292,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
                   // クリーンアップ関数
                   return () => {
+                    clearInterval(jsQRInterval);
                     clearInterval(zxingInterval);
                     if (codeReaderRef.current) {
                       codeReaderRef.current = null;
