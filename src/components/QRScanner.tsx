@@ -129,9 +129,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { min: 1280, ideal: 1920, max: 1920 },
-              height: { min: 720, ideal: 1080, max: 1080 },
-              frameRate: { min: 30, ideal: 30, max: 30 }
+              width: { min: 640, ideal: 1280, max: 1280 },
+              height: { min: 480, ideal: 720, max: 720 },
+              frameRate: { min: 15, ideal: 15, max: 15 }
             }
           });
 
@@ -199,7 +199,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                   });
                 };
 
-                const jsQRInterval = setInterval(scanWithJsQR, 200);
+                const jsQRInterval = setInterval(scanWithJsQR, 500);
 
                 const hints = new Map();
                 hints.set('TRY_HARDER', true);
@@ -263,7 +263,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                     });
                   };
 
-                  const zxingInterval = setInterval(scanWithZXing, 200);
+                  const zxingInterval = setInterval(scanWithZXing, 500);
 
                   return () => {
                     clearInterval(jsQRInterval);
