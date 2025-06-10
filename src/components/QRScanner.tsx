@@ -139,9 +139,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { min: 1920, ideal: 7680, max: 15360 },
-              height: { min: 1080, ideal: 4320, max: 8640 },
-              frameRate: { min: 60, ideal: 120, max: 240 },
+              width: { min: 1280, ideal: 1920, max: 3840 },
+              height: { min: 720, ideal: 1080, max: 2160 },
+              frameRate: { min: 30, ideal: 60, max: 120 },
               aspectRatio: { ideal: 1.777777778 } // 16:9
             }
           });
@@ -172,14 +172,14 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             });
             if (!context) return;
 
-            const width = video.videoWidth;
-            const height = video.videoHeight;
+            // キャンバスサイズを最適化（元のサイズの1/2）
+            const width = Math.floor(video.videoWidth / 2);
+            const height = Math.floor(video.videoHeight / 2);
             canvas.width = width;
             canvas.height = height;
 
             // パフォーマンス最適化のための設定
-            context.imageSmoothingEnabled = true;
-            context.imageSmoothingQuality = 'high';
+            context.imageSmoothingEnabled = false; // スムージングを無効化
             context.drawImage(video, 0, 0, width, height);
 
             // フレームカウントを更新
@@ -187,8 +187,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             const now = performance.now();
             const timeSinceLastScan = now - lastScanTimeRef.current;
 
-            // 30fpsでスキャン（約33.3ms間隔）
-            if (timeSinceLastScan >= 33.3) {
+            // スキャン頻度を15fpsに下げる（約66.7ms間隔）
+            if (timeSinceLastScan >= 66.7) {
               try {
                 const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
                 if (result) {
@@ -203,7 +203,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 }
                 lastScanTimeRef.current = now;
               } catch (error) {
-                console.error('スキャンエラー:', error);
+                // エラーログを削減
+                if (error instanceof Error && !error.message.includes('NotFoundException')) {
+                  console.error('スキャンエラー:', error);
+                }
               }
             }
 
