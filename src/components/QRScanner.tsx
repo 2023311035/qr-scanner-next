@@ -2,17 +2,6 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
-import jsQR from 'jsqr';
-
-// ZXingの型定義
-interface ZXingResult {
-  getText: () => string;
-  getBarcodeFormat: () => BarcodeFormat;
-  getResultPoints: () => Array<{
-    getX: () => number;
-    getY: () => number;
-  }>;
-}
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -22,7 +11,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
-  const [lastScannedCodes, setLastScannedCodes] = useState<string[]>([]);
   const [scale, setScale] = useState(1);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -46,11 +34,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         const newSet = new Set(prev);
         newSet.add(code);
         return new Set(Array.from(newSet).slice(-10));
-      });
-      setLastScannedCodes(prev => {
-        if (prev.includes(code)) return prev;
-        const newCodes = [...prev, code];
-        return newCodes.slice(-5);
       });
       onScanSuccess(code);
     } finally {
@@ -129,9 +112,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { min: 640, ideal: 1280, max: 1280 },
-              height: { min: 480, ideal: 720, max: 720 },
-              frameRate: { min: 15, ideal: 15, max: 15 }
+              width: { min: 640, ideal: 640, max: 1280 },
+              height: { min: 480, ideal: 480, max: 720 },
+              frameRate: { min: 10, ideal: 15, max: 15 }
             }
           });
 
@@ -149,130 +132,29 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           }
 
           const scanCode = async () => {
-            if ((video && codeReaderRef.current) || isImageMode) {
-              try {
-                console.log('スキャン開始...');
-                const scanWithJsQR = () => {
-                  if ((!video && !isImageMode) || !canvasRef.current) return;
-                  const canvas = canvasRef.current;
-                  const context = canvas.getContext('2d', { alpha: false });
-                  if (!context) return;
-                  let width, height;
-                  if (isImageMode) {
-                    width = canvas.width;
-                    height = canvas.height;
-                  } else {
-                    if (!video) return;
-                    width = video.videoWidth;
-                    height = video.videoHeight;
-                    canvas.width = width;
-                    canvas.height = height;
-                    context.drawImage(video, 0, 0, width, height);
-                  }
-                  const imageData = context.getImageData(0, 0, width, height);
-                  
-                  const codes = [];
-                  
-                  while (true) {
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
-                      inversionAttempts: "dontInvert"
-                    });
-                    
-                    if (!code) break;
-                    
-                    codes.push(code.data);
-                    
-                    const { topLeftCorner, topRightCorner, bottomLeftCorner, bottomRightCorner } = code.location;
-                    const x = Math.min(topLeftCorner.x, bottomLeftCorner.x);
-                    const y = Math.min(topLeftCorner.y, topRightCorner.y);
-                    const w = Math.max(topRightCorner.x, bottomRightCorner.x) - x;
-                    const h = Math.max(bottomLeftCorner.y, bottomRightCorner.y) - y;
-                    
-                    context.fillStyle = 'white';
-                    context.fillRect(x, y, w, h);
-                    const newImageData = context.getImageData(0, 0, width, height);
-                    imageData.data.set(newImageData.data);
-                  }
-                  
-                  codes.forEach(code => {
-                    processScannedCode(code);
-                  });
-                };
+            if (!video || !canvasRef.current) return;
+            const canvas = canvasRef.current;
+            const context = canvas.getContext('2d', { alpha: false });
+            if (!context) return;
 
-                const scanWithZXing = async () => {
-                  if (!video || !canvasRef.current) return;
-                  const canvas = canvasRef.current;
-                  const context = canvas.getContext('2d', { alpha: false });
-                  if (!context) return;
+            const width = video.videoWidth;
+            const height = video.videoHeight;
+            canvas.width = width;
+            canvas.height = height;
+            context.drawImage(video, 0, 0, width, height);
 
-                  const width = video.videoWidth;
-                  const height = video.videoHeight;
-                  canvas.width = width;
-                  canvas.height = height;
-                  context.drawImage(video, 0, 0, width, height);
-
-                  const codes: Array<{ code: string; format: BarcodeFormat; points: { x: number; y: number }[] }> = [];
-
-                  while (true) {
-                    try {
-                      const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
-                      if (!result) break;
-
-                      const code = result.getText();
-                      const format = result.getBarcodeFormat();
-                      const points = (result as ZXingResult).getResultPoints().map((point: { getX: () => number; getY: () => number }) => ({
-                        x: point.getX(),
-                        y: point.getY()
-                      }));
-
-                      codes.push({ code, format, points });
-
-                      if (points.length >= 4) {
-                        const x = Math.min(...points.map((p: { x: number; y: number }) => p.x));
-                        const y = Math.min(...points.map((p: { x: number; y: number }) => p.y));
-                        const w = Math.max(...points.map((p: { x: number; y: number }) => p.x)) - x;
-                        const h = Math.max(...points.map((p: { x: number; y: number }) => p.y)) - y;
-
-                        const padding = 10;
-                        context.fillStyle = 'white';
-                        context.fillRect(
-                          Math.max(0, x - padding),
-                          Math.max(0, y - padding),
-                          Math.min(width - x + padding, w + padding * 2),
-                          Math.min(height - y + padding, h + padding * 2)
-                        );
-                      }
-                    } catch {
-                      break;
-                    }
-                  }
-
-                  codes.forEach(({ code }) => {
-                    processScannedCode(code);
-                  });
-                };
-
-                // jsQRとZXingを交互に実行
-                let isJsQR = true;
-                const scanInterval = setInterval(() => {
-                  if (isJsQR) {
-                    scanWithJsQR();
-                  } else {
-                    scanWithZXing();
-                  }
-                  isJsQR = !isJsQR;
-                }, 1000);
-
-                return () => {
-                  clearInterval(scanInterval);
-                  if (codeReaderRef.current) {
-                    codeReaderRef.current = null;
-                  }
-                };
-              } catch (error) {
-                console.error('スキャンエラー:', error);
+            try {
+              const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
+              if (result) {
+                const code = result.getText();
+                processScannedCode(code);
               }
+            } catch (error) {
+              console.error('スキャンエラー:', error);
             }
+
+            // スキャン間隔を調整（200ms）
+            scanTimeoutRef.current = setTimeout(scanCode, 200);
           };
 
           await scanCode();
@@ -324,7 +206,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     setIsImageMode(true);
 
     try {
-      // ZXingの初期化を確認
       if (!codeReaderRef.current) {
         console.log('ZXingを初期化中...');
         try {
@@ -363,84 +244,22 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               }
             }
 
-            // ★canvasのサイズをimgのピクセルサイズに必ず合わせる
             canvas.width = width;
             canvas.height = height;
-
-            // 画像を描画（高品質設定）
-            context.imageSmoothingEnabled = true;
-            context.imageSmoothingQuality = 'high';
             context.drawImage(img, 0, 0, width, height);
 
-            // ★canvas内容を目視確認
-            window.open(canvas.toDataURL('image/png'));
-
-            // --- QRコード用: グレースケール＋コントラスト強調したImageDataでjsQR ---
-            const imageData = context.getImageData(0, 0, width, height);
-            for (let i = 0; i < imageData.data.length; i += 4) {
-              const avg = (imageData.data[i] + imageData.data[i + 1] + imageData.data[i + 2]) / 3;
-              const contrast = 2.0;
-              const contrasted = Math.min(255, Math.max(0, (avg - 128) * contrast + 128));
-              imageData.data[i] = imageData.data[i + 1] = imageData.data[i + 2] = contrasted;
-            }
-            // jsQRは加工後ImageDataで呼ぶ
-            const jsQRResult = jsQR(imageData.data, width, height, { inversionAttempts: "attemptBoth" });
-            if (jsQRResult) {
-              const code = jsQRResult.data;
-              console.log('画像から検出されたコード（jsQR）:', {
-                text: code,
-                format: 'QR_CODE',
-                imageSize: { width, height },
-                timestamp: new Date().toISOString()
-              });
-              if (sessionScannedCodesRef.current.has(code)) {
-                return;
-              }
-              sessionScannedCodesRef.current.add(code);
-              setScannedCodes(prev => {
-                const newSet = new Set(prev);
-                newSet.add(code);
-                return new Set(Array.from(newSet).slice(-10));
-              });
-              setLastScannedCodes(prev => {
-                if (prev.includes(code)) return prev;
-                const newCodes = [...prev, code];
-                return newCodes.slice(-5);
-              });
-              onScanSuccess(code);
-              pauseScanning();
-              return;
-            }
-
-            // --- バーコード用: 元画像のままcanvasを再描画してZXing ---
-            context.drawImage(img, 0, 0, width, height); // 元画像で上書き
             try {
               const result = await codeReaderRef.current.decodeFromImageUrl(canvas.toDataURL());
               if (result) {
                 const code = result.getText();
-                console.log('画像から検出されたコード（ZXing）:', {
+                console.log('画像から検出されたコード:', {
                   text: code,
                   format: result.getBarcodeFormat(),
                   imageSize: { width, height },
                   timestamp: new Date().toISOString()
                 });
-                if (sessionScannedCodesRef.current.has(code)) {
-                  return;
-                }
-                sessionScannedCodesRef.current.add(code);
-                setScannedCodes(prev => {
-                  const newSet = new Set(prev);
-                  newSet.add(code);
-                  return new Set(Array.from(newSet).slice(-10));
-                });
-                setLastScannedCodes(prev => {
-                  if (prev.includes(code)) return prev;
-                  const newCodes = [...prev, code];
-                  return newCodes.slice(-5);
-                });
-                onScanSuccess(code);
+                processScannedCode(code);
                 pauseScanning();
-                return;
               }
             } catch (err) {
               console.log('ZXingによる画像デコード失敗:', err);
@@ -513,36 +332,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             </label>
           </div>
           <div className="mt-6 space-y-6">
-            {lastScannedCodes.length > 0 && (
-              <div className="p-4 bg-gray-800 border border-green-700 rounded-lg shadow-sm">
-                <h3 className="text-lg font-semibold mb-2 text-green-400">最新のスキャン結果:</h3>
-                <ul className="space-y-1">
-                  {[...lastScannedCodes].reverse().map((code, idx) => (
-                    <li key={idx}>
-                      {isValidUrl(code) ? (
-                        <a 
-                          href={code} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-blue-400 hover:text-blue-300 break-all hover:underline"
-                        >
-                          {code}
-                        </a>
-                      ) : (
-                        <p className="break-all text-gray-300">{code}</p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
             <div className="bg-gray-800 p-4 rounded-lg shadow-sm">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold text-white">スキャン履歴:</h3>
                 <button
                   onClick={() => {
                     setScannedCodes(new Set());
-                    sessionScannedCodesRef.current = new Set(); // 履歴クリア時のみ
+                    sessionScannedCodesRef.current = new Set();
                   }}
                   className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
                 >
