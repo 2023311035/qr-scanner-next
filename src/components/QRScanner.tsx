@@ -134,9 +134,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { min: 640, ideal: 1280, max: 1920 },
-              height: { min: 480, ideal: 720, max: 1080 },
-              frameRate: { min: 15, ideal: 30, max: 60 }
+              width: { min: 1280, ideal: 3840, max: 7680 },
+              height: { min: 720, ideal: 2160, max: 4320 },
+              frameRate: { min: 30, ideal: 60, max: 120 },
+              aspectRatio: { ideal: 1.777777778 } // 16:9
             }
           });
 
@@ -156,13 +157,21 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const scanCode = async () => {
             if (!video || !canvasRef.current) return;
             const canvas = canvasRef.current;
-            const context = canvas.getContext('2d', { alpha: false });
+            const context = canvas.getContext('2d', { 
+              alpha: false,
+              willReadFrequently: true,
+              desynchronized: true
+            });
             if (!context) return;
 
             const width = video.videoWidth;
             const height = video.videoHeight;
             canvas.width = width;
             canvas.height = height;
+
+            // パフォーマンス最適化のための設定
+            context.imageSmoothingEnabled = true;
+            context.imageSmoothingQuality = 'high';
             context.drawImage(video, 0, 0, width, height);
 
             try {
@@ -180,11 +189,14 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               console.error('スキャンエラー:', error);
             }
 
-            // スキャン間隔を短くして、より頻繁にスキャン
-            scanTimeoutRef.current = setTimeout(scanCode, 100);
+            // requestAnimationFrameを使用してより滑らかなスキャン
+            requestAnimationFrame(() => {
+              scanTimeoutRef.current = setTimeout(scanCode, 50);
+            });
           };
 
-          await scanCode();
+          // 初回スキャン開始
+          requestAnimationFrame(scanCode);
           setIsInitializing(false);
         } catch (error) {
           console.error('ZXing初期化エラー:', error);
