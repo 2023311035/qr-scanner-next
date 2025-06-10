@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
+import { BarcodeFormat, DecodeHintType } from '@zxing/library';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -107,14 +108,35 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         try {
           console.log('ZXing初期化開始');
           const codeReader = new BrowserMultiFormatReader();
+          // サポートするフォーマットを明示的に設定
+          codeReader.hints.set(
+            DecodeHintType.POSSIBLE_FORMATS,
+            [
+              BarcodeFormat.QR_CODE,
+              BarcodeFormat.EAN_13,
+              BarcodeFormat.EAN_8,
+              BarcodeFormat.UPC_A,
+              BarcodeFormat.UPC_E,
+              BarcodeFormat.CODE_39,
+              BarcodeFormat.CODE_93,
+              BarcodeFormat.CODE_128,
+              BarcodeFormat.ITF,
+              BarcodeFormat.CODABAR,
+              BarcodeFormat.PDF_417,
+              BarcodeFormat.AZTEC,
+              BarcodeFormat.DATA_MATRIX
+            ]
+          );
+          // 読み取りの試行回数を増やす
+          codeReader.hints.set(DecodeHintType.TRY_HARDER, true);
           codeReaderRef.current = codeReader;
 
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { min: 640, ideal: 640, max: 1280 },
-              height: { min: 480, ideal: 480, max: 720 },
-              frameRate: { min: 10, ideal: 15, max: 15 }
+              width: { min: 640, ideal: 1280, max: 1920 },
+              height: { min: 480, ideal: 720, max: 1080 },
+              frameRate: { min: 15, ideal: 30, max: 60 }
             }
           });
 
@@ -147,14 +169,19 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
               if (result) {
                 const code = result.getText();
+                console.log('スキャン成功:', {
+                  text: code,
+                  format: result.getBarcodeFormat(),
+                  timestamp: new Date().toISOString()
+                });
                 processScannedCode(code);
               }
             } catch (error) {
               console.error('スキャンエラー:', error);
             }
 
-            // スキャン間隔を調整（200ms）
-            scanTimeoutRef.current = setTimeout(scanCode, 200);
+            // スキャン間隔を短くして、より頻繁にスキャン
+            scanTimeoutRef.current = setTimeout(scanCode, 100);
           };
 
           await scanCode();
