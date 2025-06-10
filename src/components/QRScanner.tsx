@@ -232,7 +232,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       }
       isInitialized = false;
     };
-  }, []); // 依存配列を空にして、初回のみ実行
+  }, [processScannedCode]);
 
   useEffect(() => {
     const video = videoRef.current;
