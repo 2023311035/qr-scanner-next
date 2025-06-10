@@ -84,7 +84,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
   useEffect(() => {
     let video: HTMLVideoElement | null = null;
+    let isInitialized = false;
+
     const initializeCamera = async () => {
+      if (isInitialized) return;
+      
       try {
         setIsInitializing(true);
         setCameraError('');
@@ -108,33 +112,32 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         }
 
         try {
-          console.log('ZXing初期化開始');
-          const codeReader = new BrowserMultiFormatReader();
-          // サポートするフォーマットを明示的に設定
-          codeReader.hints.set(
-            DecodeHintType.POSSIBLE_FORMATS,
-            [
-              BarcodeFormat.QR_CODE,
-              BarcodeFormat.EAN_13,
-              BarcodeFormat.EAN_8,
-              BarcodeFormat.UPC_A,
-              BarcodeFormat.UPC_E,
-              BarcodeFormat.CODE_39,
-              BarcodeFormat.CODE_93,
-              BarcodeFormat.CODE_128,
-              BarcodeFormat.ITF,
-              BarcodeFormat.CODABAR,
-              BarcodeFormat.PDF_417,
-              BarcodeFormat.AZTEC,
-              BarcodeFormat.DATA_MATRIX
-            ]
-          );
-          // 読み取りの試行回数を増やす
-          codeReader.hints.set(DecodeHintType.TRY_HARDER, true);
-          // パフォーマンス最適化のための設定
-          codeReader.hints.set(DecodeHintType.PURE_BARCODE, false);
-          codeReader.hints.set(DecodeHintType.CHARACTER_SET, 'UTF-8');
-          codeReaderRef.current = codeReader;
+          if (!codeReaderRef.current) {
+            console.log('ZXing初期化開始');
+            const codeReader = new BrowserMultiFormatReader();
+            codeReader.hints.set(
+              DecodeHintType.POSSIBLE_FORMATS,
+              [
+                BarcodeFormat.QR_CODE,
+                BarcodeFormat.EAN_13,
+                BarcodeFormat.EAN_8,
+                BarcodeFormat.UPC_A,
+                BarcodeFormat.UPC_E,
+                BarcodeFormat.CODE_39,
+                BarcodeFormat.CODE_93,
+                BarcodeFormat.CODE_128,
+                BarcodeFormat.ITF,
+                BarcodeFormat.CODABAR,
+                BarcodeFormat.PDF_417,
+                BarcodeFormat.AZTEC,
+                BarcodeFormat.DATA_MATRIX
+              ]
+            );
+            codeReader.hints.set(DecodeHintType.TRY_HARDER, true);
+            codeReader.hints.set(DecodeHintType.PURE_BARCODE, false);
+            codeReader.hints.set(DecodeHintType.CHARACTER_SET, 'UTF-8');
+            codeReaderRef.current = codeReader;
+          }
 
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
@@ -142,7 +145,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
               width: { min: 1280, ideal: 1920, max: 3840 },
               height: { min: 720, ideal: 1080, max: 2160 },
               frameRate: { min: 30, ideal: 60, max: 120 },
-              aspectRatio: { ideal: 1.777777778 } // 16:9
+              aspectRatio: { ideal: 1.777777778 }
             }
           });
 
@@ -162,60 +165,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             });
           }
 
-          const scanCode = async () => {
-            if (!video || !canvasRef.current) return;
-            const canvas = canvasRef.current;
-            const context = canvas.getContext('2d', { 
-              alpha: false,
-              willReadFrequently: true,
-              desynchronized: true
-            });
-            if (!context) return;
-
-            // キャンバスサイズを最適化（元のサイズの1/2）
-            const width = Math.floor(video.videoWidth / 2);
-            const height = Math.floor(video.videoHeight / 2);
-            canvas.width = width;
-            canvas.height = height;
-
-            // パフォーマンス最適化のための設定
-            context.imageSmoothingEnabled = false; // スムージングを無効化
-            context.drawImage(video, 0, 0, width, height);
-
-            // フレームカウントを更新
-            frameCountRef.current++;
-            const now = performance.now();
-            const timeSinceLastScan = now - lastScanTimeRef.current;
-
-            // スキャン頻度を15fpsに下げる（約66.7ms間隔）
-            if (timeSinceLastScan >= 66.7) {
-              try {
-                const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
-                if (result) {
-                  const code = result.getText();
-                  console.log('スキャン成功:', {
-                    text: code,
-                    format: result.getBarcodeFormat(),
-                    timestamp: new Date().toISOString(),
-                    frameCount: frameCountRef.current
-                  });
-                  processScannedCode(code);
-                }
-                lastScanTimeRef.current = now;
-              } catch (error) {
-                // エラーログを削減
-                if (error instanceof Error && !error.message.includes('NotFoundException')) {
-                  console.error('スキャンエラー:', error);
-                }
-              }
-            }
-
-            // requestAnimationFrameを使用してより滑らかなスキャン
-            requestAnimationFrame(scanCode);
-          };
-
-          // 初回スキャン開始
-          requestAnimationFrame(scanCode);
+          isInitialized = true;
           setIsInitializing(false);
         } catch (error) {
           console.error('ZXing初期化エラー:', error);
@@ -229,19 +179,60 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       }
     };
 
-    initializeCamera();
+    const scanCode = async () => {
+      if (!video || !canvasRef.current || !codeReaderRef.current) return;
+      
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d', { 
+        alpha: false,
+        willReadFrequently: true,
+        desynchronized: true
+      });
+      if (!context) return;
+
+      const width = Math.floor(video.videoWidth / 2);
+      const height = Math.floor(video.videoHeight / 2);
+      canvas.width = width;
+      canvas.height = height;
+
+      context.imageSmoothingEnabled = false;
+      context.drawImage(video, 0, 0, width, height);
+
+      const now = performance.now();
+      const timeSinceLastScan = now - lastScanTimeRef.current;
+
+      if (timeSinceLastScan >= 66.7) {
+        try {
+          const result = await codeReaderRef.current.decodeFromCanvas(canvas);
+          if (result) {
+            const code = result.getText();
+            processScannedCode(code);
+          }
+          lastScanTimeRef.current = now;
+        } catch (error) {
+          if (error instanceof Error && !error.message.includes('NotFoundException')) {
+            console.error('スキャンエラー:', error);
+          }
+        }
+      }
+
+      requestAnimationFrame(scanCode);
+    };
+
+    initializeCamera().then(() => {
+      if (isInitialized) {
+        requestAnimationFrame(scanCode);
+      }
+    });
 
     return () => {
       if (video && video.srcObject) {
         const stream = video.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
       }
-      const timeoutRef = scanTimeoutRef.current;
-      if (timeoutRef) {
-        clearTimeout(timeoutRef);
-      }
+      isInitialized = false;
     };
-  }, [isImageMode, processScannedCode]);
+  }, []); // 依存配列を空にして、初回のみ実行
 
   useEffect(() => {
     const video = videoRef.current;
