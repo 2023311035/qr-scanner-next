@@ -21,6 +21,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const lastTouchDistanceRef = useRef<number | null>(null);
   const processingCodeRef = useRef<boolean>(false);
   const [isImageMode, setIsImageMode] = useState(false);
+  const frameCountRef = useRef(0);
+  const lastScanTimeRef = useRef(0);
 
   // コード処理を一元化する関数
   const processScannedCode = useCallback((code: string) => {
@@ -129,14 +131,17 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           );
           // 読み取りの試行回数を増やす
           codeReader.hints.set(DecodeHintType.TRY_HARDER, true);
+          // パフォーマンス最適化のための設定
+          codeReader.hints.set(DecodeHintType.PURE_BARCODE, false);
+          codeReader.hints.set(DecodeHintType.CHARACTER_SET, 'UTF-8');
           codeReaderRef.current = codeReader;
 
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { min: 1280, ideal: 3840, max: 7680 },
-              height: { min: 720, ideal: 2160, max: 4320 },
-              frameRate: { min: 30, ideal: 60, max: 120 },
+              width: { min: 1920, ideal: 7680, max: 15360 },
+              height: { min: 1080, ideal: 4320, max: 8640 },
+              frameRate: { min: 60, ideal: 120, max: 240 },
               aspectRatio: { ideal: 1.777777778 } // 16:9
             }
           });
@@ -144,6 +149,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           if (videoRef.current) {
             video = videoRef.current;
             video.srcObject = stream;
+            video.setAttribute('playsinline', 'true');
+            video.setAttribute('autoplay', 'true');
+            video.setAttribute('muted', 'true');
             await video.play();
             const settings = stream.getVideoTracks()[0].getSettings();
             console.log('カメラストリーム取得成功:', {
@@ -174,25 +182,33 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             context.imageSmoothingQuality = 'high';
             context.drawImage(video, 0, 0, width, height);
 
-            try {
-              const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
-              if (result) {
-                const code = result.getText();
-                console.log('スキャン成功:', {
-                  text: code,
-                  format: result.getBarcodeFormat(),
-                  timestamp: new Date().toISOString()
-                });
-                processScannedCode(code);
+            // フレームカウントを更新
+            frameCountRef.current++;
+            const now = performance.now();
+            const timeSinceLastScan = now - lastScanTimeRef.current;
+
+            // 30fpsでスキャン（約33.3ms間隔）
+            if (timeSinceLastScan >= 33.3) {
+              try {
+                const result = await codeReaderRef.current?.decodeFromCanvas(canvas);
+                if (result) {
+                  const code = result.getText();
+                  console.log('スキャン成功:', {
+                    text: code,
+                    format: result.getBarcodeFormat(),
+                    timestamp: new Date().toISOString(),
+                    frameCount: frameCountRef.current
+                  });
+                  processScannedCode(code);
+                }
+                lastScanTimeRef.current = now;
+              } catch (error) {
+                console.error('スキャンエラー:', error);
               }
-            } catch (error) {
-              console.error('スキャンエラー:', error);
             }
 
             // requestAnimationFrameを使用してより滑らかなスキャン
-            requestAnimationFrame(() => {
-              scanTimeoutRef.current = setTimeout(scanCode, 50);
-            });
+            requestAnimationFrame(scanCode);
           };
 
           // 初回スキャン開始
