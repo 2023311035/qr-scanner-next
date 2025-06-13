@@ -9,7 +9,7 @@ interface QRScannerProps {
 }
 
 export default function QRScanner({ onScanSuccess }: QRScannerProps) {
-  const [scannedCodes, setScannedCodes] = useState<Set<string>>(new Set());
+  const [scannedCodes, setScannedCodes] = useState<string[]>([]);
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [scale, setScale] = useState(1);
@@ -23,6 +23,25 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const lastScanTimeRef = useRef(0);
   const frameCountRef = useRef(0);
   const isScanningRef = useRef(false);
+  const streamRef = useRef<MediaStream | null>(null);
+  const memoryCleanupRef = useRef<NodeJS.Timeout | null>(null);
+  const lastCleanupTimeRef = useRef(0);
+
+  // メモリクリーンアップ関数
+  const cleanupMemory = useCallback(() => {
+    const now = performance.now();
+    // 最後のクリーンアップから30秒以上経過している場合のみ実行
+    if (now - lastCleanupTimeRef.current >= 30000) {
+      if (memoryCleanupRef.current) {
+        clearTimeout(memoryCleanupRef.current);
+      }
+      memoryCleanupRef.current = setTimeout(() => {
+        // 最新の20件のみを保持
+        setScannedCodes(prev => prev.slice(-20));
+        lastCleanupTimeRef.current = now;
+      }, 1000);
+    }
+  }, []);
 
   // コード処理を一元化する関数
   const processScannedCode = useCallback((code: string) => {
@@ -34,87 +53,74 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       }
       sessionScannedCodesRef.current.add(code);
       setScannedCodes(prev => {
-        const newSet = new Set(prev);
-        newSet.add(code);
-        const codes = Array.from(newSet);
-        if (codes.length > 10) {
-          return new Set(codes.slice(-10));
-        }
-        return newSet;
+        const newCodes = [...prev, code];
+        // 最新の20件を保持
+        return newCodes.slice(-20);
       });
       onScanSuccess(code);
+      cleanupMemory();
     } finally {
       processingCodeRef.current = false;
     }
-  }, [onScanSuccess]);
+  }, [onScanSuccess, cleanupMemory]);
 
-  // セッション履歴をクリアする関数を追加
-  const clearSessionHistory = useCallback(() => {
-    sessionScannedCodesRef.current.clear();
+  // カメラストリームの初期化
+  const initializeCamera = useCallback(async () => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
+      return null;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+          width: { min: 1920, ideal: 2560, max: 3840 },
+          height: { min: 1080, ideal: 1440, max: 2160 },
+          frameRate: { min: 30, ideal: 60, max: 120 },
+          aspectRatio: { ideal: 1.777777778 }
+        }
+      });
+
+      streamRef.current = stream;
+      return stream;
+    } catch (error) {
+      console.error('カメラ初期化エラー:', error);
+      setCameraError('カメラの初期化に失敗しました。');
+      return null;
+    }
   }, []);
 
-  // コンポーネントのアンマウント時にセッション履歴をクリア
+  // カメラストリームの停止
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  }, []);
+
+  // コンポーネントのアンマウント時にクリーンアップ
   useEffect(() => {
     return () => {
-      clearSessionHistory();
+      if (memoryCleanupRef.current) {
+        clearTimeout(memoryCleanupRef.current);
+      }
+      stopCamera();
+      sessionScannedCodesRef.current.clear();
     };
-  }, [clearSessionHistory]);
-
-  // スキャン処理を一時停止する関数
-  const pauseScanning = () => {
-    if (scanTimeoutRef.current) {
-      clearTimeout(scanTimeoutRef.current);
-    }
-  };
-
-  // ピンチズームの処理をuseCallbackでラップ
-  const handleTouchMove = useCallback((e: TouchEvent) => {
-    if (e.touches.length === 2 && lastTouchDistanceRef.current !== null) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      const currentDistance = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-      const delta = currentDistance / lastTouchDistanceRef.current;
-      const newScale = Math.min(Math.max(scale * delta, 1), 3);
-      setScale(newScale);
-      lastTouchDistanceRef.current = currentDistance;
-    }
-  }, [scale]);
-
-  const handleTouchStart = (e: TouchEvent) => {
-    if (e.touches.length === 2) {
-      const touch1 = e.touches[0];
-      const touch2 = e.touches[1];
-      lastTouchDistanceRef.current = Math.hypot(
-        touch2.clientX - touch1.clientX,
-        touch2.clientY - touch1.clientY
-      );
-    }
-  };
-
-  const handleTouchEnd = () => {
-    lastTouchDistanceRef.current = null;
-  };
+  }, [stopCamera]);
 
   useEffect(() => {
     let video: HTMLVideoElement | null = null;
     let isInitialized = false;
 
-    const initializeCamera = async () => {
+    const setupCamera = async () => {
       if (isInitialized) return;
       
       try {
         setIsInitializing(true);
         setCameraError('');
         sessionScannedCodesRef.current = new Set();
-
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
-          setIsInitializing(false);
-          return;
-        }
 
         const devices = await navigator.mediaDevices.enumerateDevices();
         const videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -154,15 +160,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             codeReaderRef.current = codeReader;
           }
 
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: "environment",
-              width: { min: 1920, ideal: 2560, max: 3840 },
-              height: { min: 1080, ideal: 1440, max: 2160 },
-              frameRate: { min: 30, ideal: 60, max: 120 },
-              aspectRatio: { ideal: 1.777777778 }
-            }
-          });
+          const stream = await initializeCamera();
+          if (!stream) {
+            setIsInitializing(false);
+            return;
+          }
 
           if (videoRef.current) {
             video = videoRef.current;
@@ -205,9 +207,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       });
       if (!context) return;
 
-      // 解像度を上げつつ、処理を最適化
-      const width = Math.floor(video.videoWidth / 2.5);
-      const height = Math.floor(video.videoHeight / 2.5);
+      // 解像度を最適化（処理用）
+      const width = Math.floor(video.videoWidth / 2);
+      const height = Math.floor(video.videoHeight / 2);
       canvas.width = width;
       canvas.height = height;
 
@@ -240,20 +242,55 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       requestAnimationFrame(scanCode);
     };
 
-    initializeCamera().then(() => {
+    setupCamera().then(() => {
       if (isInitialized) {
         requestAnimationFrame(scanCode);
       }
     });
 
     return () => {
-      if (video && video.srcObject) {
-        const stream = video.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-      }
+      stopCamera();
       isInitialized = false;
     };
-  }, [processScannedCode]);
+  }, [initializeCamera, processScannedCode, stopCamera]);
+
+  // スキャン処理を一時停止する関数
+  const pauseScanning = () => {
+    if (scanTimeoutRef.current) {
+      clearTimeout(scanTimeoutRef.current);
+    }
+  };
+
+  // ピンチズームの処理をuseCallbackでラップ
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (e.touches.length === 2 && lastTouchDistanceRef.current !== null) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDistance = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+      const delta = currentDistance / lastTouchDistanceRef.current;
+      const newScale = Math.min(Math.max(scale * delta, 1), 3);
+      setScale(newScale);
+      lastTouchDistanceRef.current = currentDistance;
+    }
+  }, [scale]);
+
+  const handleTouchStart = (e: TouchEvent) => {
+    if (e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      lastTouchDistanceRef.current = Math.hypot(
+        touch2.clientX - touch1.clientX,
+        touch2.clientY - touch1.clientY
+      );
+    }
+  };
+
+  const handleTouchEnd = () => {
+    lastTouchDistanceRef.current = null;
+  };
 
   useEffect(() => {
     const video = videoRef.current;
@@ -406,7 +443,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 <h3 className="text-lg font-semibold text-white">スキャン履歴:</h3>
                 <button
                   onClick={() => {
-                    setScannedCodes(new Set());
+                    setScannedCodes([]);
                     sessionScannedCodesRef.current = new Set();
                   }}
                   className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
@@ -415,7 +452,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 </button>
               </div>
               <ul className="space-y-2 max-h-[440px] overflow-y-auto pr-2">
-                {Array.from(scannedCodes).reverse().map((code, index) => (
+                {scannedCodes.reverse().map((code, index) => (
                   <li key={index} className="p-3 bg-gray-700 rounded-md shadow-sm hover:shadow-md transition-shadow duration-200">
                     {isValidUrl(code) ? (
                       <a 
