@@ -55,6 +55,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       // 新しいコードをセッション履歴に追加
       sessionScannedCodesRef.current.add(code);
       setScannedCodes(prev => {
+        if (prev.includes(code)) return prev; // すでに履歴にあれば追加しない
         const newCodes = [...prev, code];
         return newCodes.slice(-20);
       });
