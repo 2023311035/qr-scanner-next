@@ -21,6 +21,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const lastTouchDistanceRef = useRef<number | null>(null);
   const processingCodeRef = useRef<boolean>(false);
   const lastScanTimeRef = useRef(0);
+  const frameCountRef = useRef(0);
+  const isScanningRef = useRef(false);
 
   // コード処理を一元化する関数
   const processScannedCode = useCallback((code: string) => {
@@ -31,11 +33,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         return;
       }
       sessionScannedCodesRef.current.add(code);
-      // メモリ効率を改善
       setScannedCodes(prev => {
         const newSet = new Set(prev);
         newSet.add(code);
-        // 最新の10件のみを保持
         const codes = Array.from(newSet);
         if (codes.length > 10) {
           return new Set(codes.slice(-10));
@@ -157,8 +157,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           const stream = await navigator.mediaDevices.getUserMedia({
             video: {
               facingMode: "environment",
-              width: { min: 1280, ideal: 1920, max: 3840 },
-              height: { min: 720, ideal: 1080, max: 2160 },
+              width: { min: 1920, ideal: 2560, max: 3840 },
+              height: { min: 1080, ideal: 1440, max: 2160 },
               frameRate: { min: 30, ideal: 60, max: 120 },
               aspectRatio: { ideal: 1.777777778 }
             }
@@ -195,7 +195,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     };
 
     const scanCode = async () => {
-      if (!video || !canvasRef.current || !codeReaderRef.current) return;
+      if (!video || !canvasRef.current || !codeReaderRef.current || isScanningRef.current) return;
       
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d', { 
@@ -205,9 +205,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       });
       if (!context) return;
 
-      // 解像度をさらに下げて処理を軽量化
-      const width = Math.floor(video.videoWidth / 4);
-      const height = Math.floor(video.videoHeight / 4);
+      // 解像度を上げつつ、処理を最適化
+      const width = Math.floor(video.videoWidth / 2.5);
+      const height = Math.floor(video.videoHeight / 2.5);
       canvas.width = width;
       canvas.height = height;
 
@@ -217,7 +217,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const now = performance.now();
       const timeSinceLastScan = now - lastScanTimeRef.current;
 
-      if (timeSinceLastScan >= 66.7) {
+      // フレームカウントを増やし、一定間隔でのみスキャン
+      frameCountRef.current++;
+      if (frameCountRef.current % 2 === 0 && timeSinceLastScan >= 100) {
+        isScanningRef.current = true;
         try {
           const result = await codeReaderRef.current.decodeFromCanvas(canvas);
           if (result) {
@@ -229,6 +232,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           if (error instanceof Error && !error.message.includes('NotFoundException')) {
             console.error('スキャンエラー:', error);
           }
+        } finally {
+          isScanningRef.current = false;
         }
       }
 
