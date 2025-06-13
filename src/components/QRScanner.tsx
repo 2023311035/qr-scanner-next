@@ -48,13 +48,14 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     if (processingCodeRef.current) return;
     processingCodeRef.current = true;
     try {
+      // セッション中に既にスキャンされたコードは処理しない
       if (sessionScannedCodesRef.current.has(code)) {
         return;
       }
+      // 新しいコードをセッション履歴に追加
       sessionScannedCodesRef.current.add(code);
       setScannedCodes(prev => {
         const newCodes = [...prev, code];
-        // 最新の20件を保持
         return newCodes.slice(-20);
       });
       onScanSuccess(code);
@@ -72,6 +73,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     }
 
     try {
+      // カメラ初期化時にセッション履歴をクリア
+      sessionScannedCodesRef.current.clear();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
@@ -96,6 +99,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
+      // カメラ停止時にセッション履歴をクリア
+      sessionScannedCodesRef.current.clear();
     }
   }, []);
 
