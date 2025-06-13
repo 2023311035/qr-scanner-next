@@ -20,8 +20,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const scanTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastTouchDistanceRef = useRef<number | null>(null);
   const processingCodeRef = useRef<boolean>(false);
-  const [isImageMode, setIsImageMode] = useState(false);
-  const frameCountRef = useRef(0);
   const lastScanTimeRef = useRef(0);
 
   // コード処理を一元化する関数
@@ -93,7 +91,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         setIsInitializing(true);
         setCameraError('');
         sessionScannedCodesRef.current = new Set();
-        setIsImageMode(false);
 
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
@@ -252,7 +249,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    setIsImageMode(true);
 
     try {
       if (!codeReaderRef.current) {
