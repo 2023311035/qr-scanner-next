@@ -31,16 +31,34 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         return;
       }
       sessionScannedCodesRef.current.add(code);
+      // メモリ効率を改善
       setScannedCodes(prev => {
         const newSet = new Set(prev);
         newSet.add(code);
-        return new Set(Array.from(newSet).slice(-10));
+        // 最新の10件のみを保持
+        const codes = Array.from(newSet);
+        if (codes.length > 10) {
+          return new Set(codes.slice(-10));
+        }
+        return newSet;
       });
       onScanSuccess(code);
     } finally {
       processingCodeRef.current = false;
     }
   }, [onScanSuccess]);
+
+  // セッション履歴をクリアする関数を追加
+  const clearSessionHistory = useCallback(() => {
+    sessionScannedCodesRef.current.clear();
+  }, []);
+
+  // コンポーネントのアンマウント時にセッション履歴をクリア
+  useEffect(() => {
+    return () => {
+      clearSessionHistory();
+    };
+  }, [clearSessionHistory]);
 
   // スキャン処理を一時停止する関数
   const pauseScanning = () => {
@@ -187,8 +205,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       });
       if (!context) return;
 
-      const width = Math.floor(video.videoWidth / 2);
-      const height = Math.floor(video.videoHeight / 2);
+      // 解像度をさらに下げて処理を軽量化
+      const width = Math.floor(video.videoWidth / 4);
+      const height = Math.floor(video.videoHeight / 4);
       canvas.width = width;
       canvas.height = height;
 
