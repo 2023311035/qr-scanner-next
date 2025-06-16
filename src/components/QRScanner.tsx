@@ -74,14 +74,13 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     }
 
     try {
-      // カメラ初期化時にセッション履歴をクリア
       sessionScannedCodesRef.current.clear();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
-          width: { min: 1920, ideal: 2560, max: 3840 },
-          height: { min: 1080, ideal: 1440, max: 2160 },
-          frameRate: { min: 30, ideal: 60, max: 120 },
+          width: { min: 1280, ideal: 1920, max: 2560 },
+          height: { min: 720, ideal: 1080, max: 1440 },
+          frameRate: { min: 24, ideal: 30, max: 60 },
           aspectRatio: { ideal: 1.777777778 }
         }
       });
@@ -214,20 +213,33 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       if (!context) return;
 
       // 解像度を最適化（処理用）
-      const width = Math.floor(video.videoWidth / 2);
-      const height = Math.floor(video.videoHeight / 2);
+      const width = Math.floor(video.videoWidth / 1.5);
+      const height = Math.floor(video.videoHeight / 1.5);
       canvas.width = width;
       canvas.height = height;
 
-      context.imageSmoothingEnabled = false;
+      // 画像の前処理
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
       context.drawImage(video, 0, 0, width, height);
+
+      // コントラストと明るさの調整
+      const imageData = context.getImageData(0, 0, width, height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        // コントラスト調整
+        data[i] = data[i] * 1.2;     // R
+        data[i + 1] = data[i + 1] * 1.2; // G
+        data[i + 2] = data[i + 2] * 1.2; // B
+      }
+      context.putImageData(imageData, 0, 0);
 
       const now = performance.now();
       const timeSinceLastScan = now - lastScanTimeRef.current;
 
       // フレームカウントを増やし、一定間隔でのみスキャン
       frameCountRef.current++;
-      if (frameCountRef.current % 2 === 0 && timeSinceLastScan >= 100) {
+      if (frameCountRef.current % 3 === 0 && timeSinceLastScan >= 150) {
         isScanningRef.current = true;
         try {
           const result = await codeReaderRef.current.decodeFromCanvas(canvas);
