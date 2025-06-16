@@ -13,6 +13,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [scale, setScale] = useState(1);
+  const [lastScannedCode, setLastScannedCode] = useState<string>('');
+  const [lastScanTimestamp, setLastScanTimestamp] = useState<number>(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -48,12 +50,19 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     if (processingCodeRef.current) return;
     processingCodeRef.current = true;
     try {
+      const now = Date.now();
+      // 同じコードが3秒以内に再度スキャンされた場合は無視
+      if (code === lastScannedCode && now - lastScanTimestamp < 3000) {
+        return;
+      }
       // セッション中に既にスキャンされたコードは処理しない
       if (sessionScannedCodesRef.current.has(code)) {
         return;
       }
       // 新しいコードをセッション履歴に追加
       sessionScannedCodesRef.current.add(code);
+      setLastScannedCode(code);
+      setLastScanTimestamp(now);
       setScannedCodes(prev => {
         if (prev.includes(code)) return prev; // すでに履歴にあれば追加しない
         const newCodes = [...prev, code];
@@ -64,7 +73,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     } finally {
       processingCodeRef.current = false;
     }
-  }, [onScanSuccess, cleanupMemory]);
+  }, [onScanSuccess, cleanupMemory, lastScannedCode, lastScanTimestamp]);
 
   // カメラストリームの初期化
   const initializeCamera = useCallback(async () => {
@@ -237,9 +246,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const now = performance.now();
       const timeSinceLastScan = now - lastScanTimeRef.current;
 
-      // フレームカウントを増やし、一定間隔でのみスキャン
+      // フレームカウントを増やし、一定間隔でのみスキャン（間隔を500msに延長）
       frameCountRef.current++;
-      if (frameCountRef.current % 3 === 0 && timeSinceLastScan >= 150) {
+      if (frameCountRef.current % 3 === 0 && timeSinceLastScan >= 500) {
         isScanningRef.current = true;
         try {
           const result = await codeReaderRef.current.decodeFromCanvas(canvas);
