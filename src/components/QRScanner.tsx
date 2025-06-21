@@ -13,8 +13,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [cameraError, setCameraError] = useState<string>('');
   const [isInitializing, setIsInitializing] = useState(true);
   const [scale, setScale] = useState(1);
-  const [lastScannedCode, setLastScannedCode] = useState<string>('');
-  const [lastScanTimestamp, setLastScanTimestamp] = useState<number>(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -28,6 +26,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const memoryCleanupRef = useRef<NodeJS.Timeout | null>(null);
   const lastCleanupTimeRef = useRef(0);
+  const lastScannedCodeRef = useRef<string>('');
+  const lastScanTimestampRef = useRef<number>(0);
 
   // メモリクリーンアップ関数
   const cleanupMemory = useCallback(() => {
@@ -52,7 +52,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     try {
       const now = Date.now();
       // 同じコードが3秒以内に再度スキャンされた場合は無視
-      if (code === lastScannedCode && now - lastScanTimestamp < 3000) {
+      if (code === lastScannedCodeRef.current && now - lastScanTimestampRef.current < 3000) {
         return;
       }
       // セッション中に既にスキャンされたコードは処理しない
@@ -61,8 +61,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       }
       // 新しいコードをセッション履歴に追加
       sessionScannedCodesRef.current.add(code);
-      setLastScannedCode(code);
-      setLastScanTimestamp(now);
+      lastScannedCodeRef.current = code;
+      lastScanTimestampRef.current = now;
       setScannedCodes(prev => {
         if (prev.includes(code)) return prev; // すでに履歴にあれば追加しない
         const newCodes = [...prev, code];
@@ -73,7 +73,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     } finally {
       processingCodeRef.current = false;
     }
-  }, [onScanSuccess, cleanupMemory, lastScannedCode, lastScanTimestamp]);
+  }, [onScanSuccess, cleanupMemory]);
 
   // カメラストリームの初期化
   const initializeCamera = useCallback(async () => {
