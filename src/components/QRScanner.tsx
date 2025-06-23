@@ -51,8 +51,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     processingCodeRef.current = true;
     try {
       const now = Date.now();
-      // 同じコードが3秒以内に再度スキャンされた場合は無視
-      if (code === lastScannedCode && now - lastScanTimestamp < 3000) {
+      // 同じコードが5秒以内に再度スキャンされた場合は無視
+      if (code === lastScannedCode && now - lastScanTimestamp < 5000) {
         return;
       }
       // セッション中に既にスキャンされたコードは処理しない
