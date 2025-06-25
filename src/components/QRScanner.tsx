@@ -87,8 +87,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
-          width: { min: 1280, ideal: 1920, max: 2560 },
-          height: { min: 720, ideal: 1080, max: 1440 },
+          width: { min: 1280, ideal: 2560, max: 2560 },
+          height: { min: 720, ideal: 1440, max: 1440 },
           frameRate: { min: 24, ideal: 30, max: 60 },
           aspectRatio: { ideal: 1.777777778 }
         }
