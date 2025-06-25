@@ -38,8 +38,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         clearTimeout(memoryCleanupRef.current);
       }
       memoryCleanupRef.current = setTimeout(() => {
-        // 最新の20件のみを保持
-        setScannedCodes(prev => prev.slice(-20));
+        // 最新の15件のみを保持
+        setScannedCodes(prev => prev.slice(-15));
         lastCleanupTimeRef.current = now;
       }, 1000);
     }
@@ -66,7 +66,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       setScannedCodes(prev => {
         if (prev.includes(code)) return prev; // すでに履歴にあれば追加しない
         const newCodes = [...prev, code];
-        return newCodes.slice(-20);
+        return newCodes.slice(-15);
       });
       onScanSuccess(code);
       cleanupMemory();
@@ -246,9 +246,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const now = performance.now();
       const timeSinceLastScan = now - lastScanTimeRef.current;
 
-      // フレームカウントを増やし、一定間隔でのみスキャン（間隔を500msに延長）
+      // フレームカウントを増やし、一定間隔でのみスキャン（間隔を1秒に延長）
       frameCountRef.current++;
-      if (frameCountRef.current % 3 === 0 && timeSinceLastScan >= 500) {
+      if (frameCountRef.current % 3 === 0 && timeSinceLastScan >= 1000) {
         isScanningRef.current = true;
         try {
           const result = await codeReaderRef.current.decodeFromCanvas(canvas);
