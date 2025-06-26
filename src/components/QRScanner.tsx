@@ -15,7 +15,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const [scale, setScale] = useState(1);
   const [lastScannedCode, setLastScannedCode] = useState<string>('');
   const [lastScanTimestamp, setLastScanTimestamp] = useState<number>(0);
-  const [isHighSpeedMode, setIsHighSpeedMode] = useState(false); // 高速スキャンモード
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
@@ -298,9 +297,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const now = performance.now();
       const timeSinceLastScan = now - lastScanTimeRef.current;
 
-      // スキャン間隔を動的に調整（通常モードと高速モード対応）
-      const scanInterval = isHighSpeedMode ? 500 : 1200; // 高速モード: 0.5秒、通常モード: 1.2秒
-      const frameInterval = isHighSpeedMode ? 2 : 4; // 高速モード: 2フレームごと、通常モード: 4フレームごと
+      // 高速スキャン間隔（0.5秒間隔で常時動作）
+      const scanInterval = 500; // 高速スキャン: 0.5秒
+      const frameInterval = 2; // 高速スキャン: 2フレームごと
       
       frameCountRef.current++;
       if (frameCountRef.current % frameInterval === 0 && timeSinceLastScan >= scanInterval) {
@@ -534,33 +533,15 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             />
           </div>
           <div className="mt-4 space-y-4">
-            <div className="flex space-x-2">
-              <label className="block w-full p-4 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
-                <span className="text-white">画像ファイルから読み取る</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </label>
-              <button
-                onClick={() => setIsHighSpeedMode(!isHighSpeedMode)}
-                className={`px-4 py-4 rounded-lg border transition-colors ${
-                  isHighSpeedMode 
-                    ? 'bg-green-600 border-green-500 text-white' 
-                    : 'bg-gray-800 border-gray-700 text-white hover:bg-gray-700'
-                }`}
-                title={isHighSpeedMode ? '高速モード: 0.5秒間隔でスキャン' : '通常モード: 1.2秒間隔でスキャン'}
-              >
-                <div className="text-sm font-semibold">
-                  {isHighSpeedMode ? '高速' : '通常'}
-                </div>
-                <div className="text-xs opacity-75">
-                  {isHighSpeedMode ? '0.5秒' : '1.2秒'}
-                </div>
-              </button>
-            </div>
+            <label className="block w-full p-4 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:bg-gray-700 transition-colors">
+              <span className="text-white">画像ファイルから読み取る</span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
           </div>
           <div className="mt-6 space-y-6">
             <div className="bg-gray-800 p-4 rounded-lg shadow-sm">
