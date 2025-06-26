@@ -47,6 +47,36 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     }
   }, []);
 
+  // 完全なリセット関数
+  const resetAllData = useCallback(() => {
+    // すべての履歴をクリア
+    setScannedCodes([]);
+    setLastScannedCode('');
+    setLastScanTimestamp(0);
+    sessionScannedCodesRef.current.clear();
+    
+    // タイマーをクリア
+    if (memoryCleanupRef.current) {
+      clearTimeout(memoryCleanupRef.current);
+      memoryCleanupRef.current = null;
+    }
+    
+    // フレームカウンターをリセット
+    frameCountRef.current = 0;
+    lastScanTimeRef.current = 0;
+    lastCleanupTimeRef.current = 0;
+    
+    // 処理フラグをリセット
+    processingCodeRef.current = false;
+    isScanningRef.current = false;
+  }, []);
+
+  // コンポーネントマウント時に自動的に履歴をリセット
+  useEffect(() => {
+    resetAllData();
+    console.log('アプリ再読み込み: 履歴を完全にリセットしました');
+  }, [resetAllData]);
+
   // コード処理を一元化する関数
   const processScannedCode = useCallback((code: string) => {
     if (processingCodeRef.current) return;
@@ -110,7 +140,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   // カメラストリームの停止
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+        track.enabled = false;
+      });
       streamRef.current = null;
       // カメラ停止時にセッション履歴をクリア
       sessionScannedCodesRef.current.clear();
@@ -120,6 +153,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
     }
+    // 処理フラグをリセット
+    isScanningRef.current = false;
+    processingCodeRef.current = false;
   }, []);
 
   // コンポーネントのアンマウント時にクリーンアップ
@@ -133,6 +169,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       }
       stopCamera();
       sessionScannedCodesRef.current.clear();
+      // ZXingインスタンスもクリア
+      if (codeReaderRef.current) {
+        codeReaderRef.current = null;
+      }
     };
   }, [stopCamera]);
 
@@ -350,10 +390,35 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     if (!file) return;
 
     try {
+      // 既存のZXingインスタンスを再利用（新しく作成しない）
       if (!codeReaderRef.current) {
         console.log('ZXingを初期化中...');
         try {
-          codeReaderRef.current = new BrowserMultiFormatReader();
+          const codeReader = new BrowserMultiFormatReader();
+          codeReader.hints.set(
+            DecodeHintType.POSSIBLE_FORMATS,
+            [
+              BarcodeFormat.QR_CODE,
+              BarcodeFormat.EAN_13,
+              BarcodeFormat.EAN_8,
+              BarcodeFormat.UPC_A,
+              BarcodeFormat.UPC_E,
+              BarcodeFormat.CODE_39,
+              BarcodeFormat.CODE_93,
+              BarcodeFormat.CODE_128,
+              BarcodeFormat.ITF,
+              BarcodeFormat.CODABAR,
+              BarcodeFormat.PDF_417,
+              BarcodeFormat.AZTEC,
+              BarcodeFormat.DATA_MATRIX
+            ]
+          );
+          codeReader.hints.set(DecodeHintType.TRY_HARDER, true);
+          codeReader.hints.set(DecodeHintType.PURE_BARCODE, false);
+          codeReader.hints.set(DecodeHintType.CHARACTER_SET, 'UTF-8');
+          codeReader.hints.set(DecodeHintType.NEED_RESULT_POINT_CALLBACK, false);
+          codeReader.hints.set(DecodeHintType.ASSUME_CODE_39_CHECK_DIGIT, false);
+          codeReaderRef.current = codeReader;
           console.log('ZXing初期化成功');
         } catch (error) {
           console.error('ZXing初期化エラー:', error);
@@ -479,15 +544,24 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             <div className="bg-gray-800 p-4 rounded-lg shadow-sm">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="text-lg font-semibold text-white">スキャン履歴:</h3>
-                <button
-                  onClick={() => {
-                    setScannedCodes([]);
-                    sessionScannedCodesRef.current = new Set();
-                  }}
-                  className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
-                >
-                  履歴をクリア
-                </button>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => {
+                      setScannedCodes([]);
+                      sessionScannedCodesRef.current = new Set();
+                    }}
+                    className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                  >
+                    履歴をクリア
+                  </button>
+                  <button
+                    onClick={resetAllData}
+                    className="text-sm px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded transition-colors"
+                    title="すべてのデータをリセットしてメモリをクリア"
+                  >
+                    完全リセット
+                  </button>
+                </div>
               </div>
               <ul className="space-y-2 max-h-[440px] overflow-y-auto pr-2">
                 {scannedCodes.reverse().map((code, index) => (

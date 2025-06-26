@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const QRScanner = dynamic(() => import('@/components/QRScanner'), {
   ssr: false,
@@ -10,6 +10,12 @@ const QRScanner = dynamic(() => import('@/components/QRScanner'), {
 export default function Home() {
   const [scannedResults, setScannedResults] = useState<string[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+
+  // ページ読み込み時にスキャン結果をリセット
+  useEffect(() => {
+    setScannedResults([]);
+    console.log('ページ読み込み: スキャン結果をリセットしました');
+  }, []);
 
   const handleScanSuccess = (decodedText: string) => {
     setScannedResults((prev) => [decodedText, ...prev].slice(0, 10));
@@ -21,6 +27,12 @@ export default function Home() {
 
   const handleStopScan = () => {
     setIsScanning(false);
+  };
+
+  // 手動でスキャン結果をリセットする関数
+  const resetScanResults = () => {
+    setScannedResults([]);
+    console.log('手動リセット: スキャン結果をクリアしました');
   };
 
   return (
@@ -79,9 +91,20 @@ export default function Home() {
         )}
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-white text-center">
-            スキャン済みQRコード
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white text-center">
+              スキャン済みQRコード
+            </h2>
+            {scannedResults.length > 0 && (
+              <button
+                onClick={resetScanResults}
+                className="text-sm px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors"
+                title="スキャン結果をクリア"
+              >
+                クリア
+              </button>
+            )}
+          </div>
           {scannedResults.length > 0 ? (
             <ul className="space-y-3">
               {scannedResults.map((result, index) => (
