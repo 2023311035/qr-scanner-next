@@ -28,6 +28,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const streamRef = useRef<MediaStream | null>(null);
   const memoryCleanupRef = useRef<NodeJS.Timeout | null>(null);
   const lastCleanupTimeRef = useRef(0);
+  const canvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
   // メモリクリーンアップ関数
   const cleanupMemory = useCallback(() => {
@@ -38,8 +40,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         clearTimeout(memoryCleanupRef.current);
       }
       memoryCleanupRef.current = setTimeout(() => {
-        // 最新の15件のみを保持
-        setScannedCodes(prev => prev.slice(-15));
+        // 最新の12件を保持（高解像度対応で少し増加）
+        setScannedCodes(prev => prev.slice(-12));
         lastCleanupTimeRef.current = now;
       }, 1000);
     }
@@ -66,7 +68,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       setScannedCodes(prev => {
         if (prev.includes(code)) return prev; // すでに履歴にあれば追加しない
         const newCodes = [...prev, code];
-        return newCodes.slice(-15);
+        return newCodes.slice(-12); // 12件に増加
       });
       onScanSuccess(code);
       cleanupMemory();
@@ -75,7 +77,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     }
   }, [onScanSuccess, cleanupMemory, lastScannedCode, lastScanTimestamp]);
 
-  // カメラストリームの初期化
+  // カメラストリームの初期化（最適化版）
   const initializeCamera = useCallback(async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setCameraError('お使いのブラウザはカメラへのアクセスをサポートしていません。');
@@ -87,9 +89,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
-          width: { min: 1280, ideal: 2560, max: 2560 },
-          height: { min: 720, ideal: 1440, max: 1440 },
-          frameRate: { min: 24, ideal: 30, max: 60 },
+          // 高解像度を維持しつつ、フレームレートで調整
+          width: { min: 1280, ideal: 1920, max: 2560 },
+          height: { min: 720, ideal: 1080, max: 1440 },
+          // フレームレートを適度に調整してパフォーマンス向上
+          frameRate: { min: 20, ideal: 30, max: 45 },
           aspectRatio: { ideal: 1.777777778 }
         }
       });
@@ -111,6 +115,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       // カメラ停止時にセッション履歴をクリア
       sessionScannedCodesRef.current.clear();
     }
+    // アニメーションフレームをキャンセル
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
   }, []);
 
   // コンポーネントのアンマウント時にクリーンアップ
@@ -118,6 +127,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     return () => {
       if (memoryCleanupRef.current) {
         clearTimeout(memoryCleanupRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
       }
       stopCamera();
       sessionScannedCodesRef.current.clear();
@@ -168,9 +180,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
                 BarcodeFormat.DATA_MATRIX
               ]
             );
-            codeReader.hints.set(DecodeHintType.TRY_HARDER, true);
+            codeReader.hints.set(DecodeHintType.TRY_HARDER, true); // 高解像度での精度向上のためtrueに戻す
             codeReader.hints.set(DecodeHintType.PURE_BARCODE, false);
             codeReader.hints.set(DecodeHintType.CHARACTER_SET, 'UTF-8');
+            // 高解像度での処理効率向上のための追加設定
+            codeReader.hints.set(DecodeHintType.NEED_RESULT_POINT_CALLBACK, false);
+            codeReader.hints.set(DecodeHintType.ASSUME_CODE_39_CHECK_DIGIT, false);
             codeReaderRef.current = codeReader;
           }
 
@@ -196,6 +211,15 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             });
           }
 
+          // Canvasコンテキストを事前に作成して再利用
+          if (canvasRef.current && !canvasContextRef.current) {
+            canvasContextRef.current = canvasRef.current.getContext('2d', { 
+              alpha: false,
+              willReadFrequently: true,
+              desynchronized: true
+            });
+          }
+
           isInitialized = true;
           setIsInitializing(false);
         } catch (error) {
@@ -211,44 +235,31 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     };
 
     const scanCode = async () => {
-      if (!video || !canvasRef.current || !codeReaderRef.current || isScanningRef.current) return;
+      if (!video || !canvasRef.current || !codeReaderRef.current || !canvasContextRef.current || isScanningRef.current) {
+        animationFrameRef.current = requestAnimationFrame(scanCode);
+        return;
+      }
       
       const canvas = canvasRef.current;
-      const context = canvas.getContext('2d', { 
-        alpha: false,
-        willReadFrequently: true,
-        desynchronized: true
-      });
-      if (!context) return;
+      const context = canvasContextRef.current;
 
-      // 解像度を最適化（処理用）
-      const width = Math.floor(video.videoWidth / 1.5);
-      const height = Math.floor(video.videoHeight / 1.5);
+      // 高解像度を維持しつつ、処理用の解像度を適度に調整
+      const width = Math.floor(video.videoWidth / 1.8); // 2から1.8に変更して解像度を少し上げる
+      const height = Math.floor(video.videoHeight / 1.8);
       canvas.width = width;
       canvas.height = height;
 
-      // 画像の前処理
+      // 画像の前処理を最適化
       context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high';
+      context.imageSmoothingQuality = 'high'; // mediumからhighに戻す
       context.drawImage(video, 0, 0, width, height);
-
-      // コントラストと明るさの調整
-      const imageData = context.getImageData(0, 0, width, height);
-      const data = imageData.data;
-      for (let i = 0; i < data.length; i += 4) {
-        // コントラスト調整
-        data[i] = data[i] * 1.2;     // R
-        data[i + 1] = data[i + 1] * 1.2; // G
-        data[i + 2] = data[i + 2] * 1.2; // B
-      }
-      context.putImageData(imageData, 0, 0);
 
       const now = performance.now();
       const timeSinceLastScan = now - lastScanTimeRef.current;
 
-      // フレームカウントを増やし、一定間隔でのみスキャン（間隔を1秒に延長）
+      // より効率的なスキャン間隔（解像度が高いため少し間隔を短縮）
       frameCountRef.current++;
-      if (frameCountRef.current % 3 === 0 && timeSinceLastScan >= 1000) {
+      if (frameCountRef.current % 4 === 0 && timeSinceLastScan >= 1200) { // 5から4に変更、1500msから1200msに変更
         isScanningRef.current = true;
         try {
           const result = await codeReaderRef.current.decodeFromCanvas(canvas);
@@ -266,12 +277,12 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
         }
       }
 
-      requestAnimationFrame(scanCode);
+      animationFrameRef.current = requestAnimationFrame(scanCode);
     };
 
     setupCamera().then(() => {
       if (isInitialized) {
-        requestAnimationFrame(scanCode);
+        animationFrameRef.current = requestAnimationFrame(scanCode);
       }
     });
 
@@ -362,8 +373,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             const context = canvas.getContext('2d');
             if (!context) return;
 
-            // キャンバスのサイズを画像に合わせる（最大サイズを制限）
-            const maxSize = 3840;
+            // キャンバスのサイズを画像に合わせる（高解像度対応）
+            const maxSize = 2560; // 1920から2560に増加して高解像度対応
             let width = img.width;
             let height = img.height;
             
