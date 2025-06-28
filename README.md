@@ -1,158 +1,171 @@
-# QRコードスキャナー
+# QRコード・バーコードスキャナー
 
 ## 概要
-このプロジェクトは、Webブラウザ上で動作する高精度なQRコード・バーコードスキャナーアプリケーションです。デバイスのカメラを使用してリアルタイムでQRコードやバーコードをスキャンし、その内容を表示・管理することができます。
+このプロジェクトは、Webブラウザ上で動作する高精度なQRコード・バーコードスキャナーアプリケーションです。デバイスのカメラを使用してリアルタイムでQRコードやバーコードをスキャンし、その内容を表示・管理することができます。高速スキャンモードにより、複数のコードを連続で読み取ることが可能です。
 
 ## 主な機能
-- リアルタイムQRコード・バーコードスキャン
-  - 高解像度カメラ対応（iPhone 15の48MPカメラ等）
-  - 60fpsの滑らかな動画処理
-  - 複数のQRコードを一つずつ同時に検出
-  - 複数の1次元バーコードを一つずつ同時に検出
-- 画像ファイルからのQRコード・バーコード読み取り
-- スキャン履歴の管理
-- レスポンシブデザイン対応
-- ダークモード対応
+
+### 🚀 高速スキャン機能
+- **常時高速スキャン**: 0.5秒間隔での連続スキャン
+- **複数コード対応**: 異なるQRコード・バーコードを連続で読み取り
+- **高解像度対応**: 1280x720〜2560x1440の高解像度カメラ対応
+- **リアルタイム処理**: 2フレームごとの高速フレーム処理
+
+### 📱 カメラ機能
+- **リアルタイムスキャン**: デバイスカメラを使用した即座の読み取り
+- **高解像度対応**: iPhone 15の48MPカメラ等の最新デバイス対応
+- **フレームレート最適化**: 20-45fpsの適応的フレームレート
+- **環境カメラ優先**: 背面カメラを優先的に使用
+
+### 📁 画像ファイル読み取り
+- **画像アップロード**: 画像ファイルからのQRコード・バーコード読み取り
+- **高解像度対応**: 最大2560pxの画像サイズ対応
+- **複数形式対応**: JPG、PNG、WebP等の主要画像形式
+
+### 📋 履歴管理機能
+- **スキャン履歴**: 最新12件のスキャン履歴を保持
+- **自動リセット**: アプリ再読み込み時に履歴を自動クリア
+- **手動クリア**: 履歴の手動クリア機能
+- **メモリクリア**: 完全なメモリリセット機能
+
+### 🛠️ メモリ管理
+- **自動クリーンアップ**: 30秒間隔でのメモリ最適化
+- **メモリリーク防止**: 適切なリソース管理とクリーンアップ
+- **パフォーマンス最適化**: 継続的な軽量化と安定性確保
+
+### 🎯 対応バーコード形式
+- **QRコード**: QR Code
+- **1次元バーコード**: EAN-13, EAN-8, UPC-A, UPC-E
+- **工業用バーコード**: CODE-39, CODE-93, CODE-128, ITF
+- **特殊バーコード**: CODABAR, PDF-417, AZTEC, DATA MATRIX
 
 ## 技術スタック
-- Next.js 14
-- TypeScript
-- jsQR
-- zbar.wasm
-- @zxing/library
-- Tailwind CSS
-- shadcn/ui
+- **フレームワーク**: Next.js 15.3.2
+- **言語**: TypeScript
+- **スキャンライブラリ**: @zxing/library, @zxing/browser
+- **スタイリング**: Tailwind CSS 4
+- **フォント**: M PLUS Rounded 1c
+- **デプロイ**: Vercel
 
 ## 動作環境
-- モダンブラウザ（Chrome, Safari, Firefox等）
-- カメラ機能をサポートするデバイス
-- モバイルデバイス（iOS, Android）対応
+- **ブラウザ**: Chrome, Safari, Firefox, Edge（最新版）
+- **デバイス**: カメラ機能をサポートするデバイス
+- **モバイル**: iOS 12+, Android 8+
+- **デスクトップ**: Windows 10+, macOS 10.15+, Linux
 
 ## セットアップ手順
-1. リポジトリのクローン
+
+### 1. リポジトリのクローン
 ```bash
 git clone https://github.com/2023311035/qr-scanner-next.git
+cd qr-scanner-next
 ```
 
-2. 依存関係のインストール
+### 2. 依存関係のインストール
 ```bash
 npm install
 ```
 
-3. 開発サーバーの起動
+### 3. 開発サーバーの起動
 ```bash
 npm run dev
 ```
 
-4. ビルド
+### 4. ブラウザでアクセス
+```
+http://localhost:3002
+```
+
+### 5. 本番ビルド
 ```bash
 npm run build
+npm start
 ```
 
 ## 使用方法
-1. カメラを起動し、QRコードやバーコードをスキャン
-2. スキャンしたコードの内容が表示されます
-3. 画像ファイルからも読み取り可能
-4. スキャン履歴は自動的に保存されます
+
+### カメラスキャン
+1. アプリを起動し、「QRコードスキャン」ボタンをクリック
+2. カメラの使用許可を承認
+3. QRコード・バーコードをカメラに向ける
+4. 0.5秒間隔で自動スキャン
+5. スキャン結果が履歴に表示
+
+### 画像ファイル読み取り
+1. 「画像ファイルから読み取る」ボタンをクリック
+2. QRコード・バーコードが含まれる画像を選択
+3. 自動的にデコードされ、結果が表示
+
+### 履歴管理
+- **履歴確認**: スキャン履歴セクションで確認
+- **履歴クリア**: 「履歴をクリア」ボタンで履歴のみ削除
+- **メモリクリア**: 「メモリクリア」ボタンで完全リセット
 
 ## カメラ設定
-- 解像度: 最大8064x6048（48MP相当）
-- フレームレート: 60fps
-- アスペクト比: 4:3
-- スキャン間隔: 50ms
+- **解像度**: 1280x720〜2560x1440（高解像度対応）
+- **フレームレート**: 20-45fps（適応的調整）
+- **スキャン間隔**: 0.5秒（500ms）
+- **フレーム処理**: 2フレームごと
+- **重複防止**: 同じコードは5秒間無視
+
+## パフォーマンス最適化
+- **メモリ管理**: 自動クリーンアップとリーク防止
+- **処理最適化**: Canvas処理の効率化
+- **解像度調整**: 処理用解像度の最適化
+- **フレーム制御**: 適切なフレーム間隔設定
 
 ## 注意事項
-- カメラの使用許可が必要です
-- 高解像度のカメラを推奨します
-- 良好な照明条件での使用を推奨します
+- **カメラ許可**: カメラの使用許可が必要です
+- **照明条件**: 良好な照明条件での使用を推奨
+- **デバイス性能**: 高解像度カメラでより良い精度
+- **ブラウザ対応**: HTTPS環境でのカメラアクセスが必要
 
 ## デプロイメント
-このプロジェクトはVercelで自動デプロイされています。mainブランチへのプッシュで自動的にデプロイが実行されます。
+このプロジェクトはVercelで自動デプロイされています。
+
+### 自動デプロイ
+- mainブランチへのプッシュで自動デプロイ
+- プレビューデプロイで動作確認
+- 本番環境への即座反映
+
+### 手動デプロイ
+```bash
+npm run build
+vercel --prod
+```
 
 ## 開発者向け情報
-- ホットリロードによる開発効率の向上
-- TypeScriptによる型安全な開発
-- VercelのGeistフォントを使用した最適化されたタイポグラフィ
-- shadcn/uiによるモダンなUIコンポーネント
+
+### 開発環境
+- **ホットリロード**: リアルタイムでの変更反映
+- **TypeScript**: 型安全な開発環境
+- **ESLint**: コード品質の自動チェック
+- **Tailwind CSS**: 効率的なスタイリング
+
+### ファイル構成
+```
+src/
+├── app/                 # Next.js App Router
+│   ├── layout.tsx      # ルートレイアウト
+│   └── page.tsx        # メインページ
+├── components/         # Reactコンポーネント
+│   └── QRScanner.tsx   # メインスキャナーコンポーネント
+└── types/             # TypeScript型定義
+```
+
+### 主要コンポーネント
+- **QRScanner**: メインスキャナー機能
+- **Home**: アプリケーションのエントリーポイント
+- **Layout**: 共通レイアウトとフォント設定
 
 ## ライセンス
 MITライセンス
 
-This is a QR code scanner web application built with Next.js.
+## 貢献
+プルリクエストやイシューの報告を歓迎します。
 
-## Features
-
-- QR code scanning using device camera
-- Support for multiple cameras
-- Real-time scanning
-- Scan history
-- Automatic deployment with Vercel
-
-## Development
-
-1. Clone the repository
-2. Install dependencies: `npm install`
-3. Run development server: `npm run dev`
-
-## Deployment
-
-This project is automatically deployed to Vercel. Any changes pushed to the main branch will trigger a new deployment.
-
-## Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## 機能説明
-
-このプロジェクトは Next.js を使用した Web アプリケーションです。主な機能は以下の通りです：
-
-### 開発環境
-- Next.js 14 を使用した最新のフロントエンド開発環境
-- TypeScript による型安全な開発
-- Vercel の Geist フォントを使用した最適化されたタイポグラフィ
-
-### 主な機能
-- ホットリロードによる開発効率の向上
-- ページの自動更新機能
-- モダンな開発体験を提供する開発サーバー
-- `app/page.tsx` からのページ編集機能
-
-### デプロイメント
-- Vercel プラットフォームとの完全な互換性
-- 簡単なデプロイプロセス
-- 自動的なビルドと最適化
-
-このプロジェクトは、モダンなウェブアプリケーション開発のためのベストプラクティスに従って構築されています。
+## 更新履歴
+- **v0.1.0**: 初期リリース
+- **最新**: 高速スキャンモード、メモリ管理最適化、自動リセット機能追加
 
 

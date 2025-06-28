@@ -223,7 +223,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             codeReader.hints.set(DecodeHintType.TRY_HARDER, true); // 高解像度での精度向上のためtrueに戻す
             codeReader.hints.set(DecodeHintType.PURE_BARCODE, false);
             codeReader.hints.set(DecodeHintType.CHARACTER_SET, 'UTF-8');
-            // 高解像度での処理効率向上のための追加設定
+            // バーコード検出精度向上のための設定
             codeReader.hints.set(DecodeHintType.NEED_RESULT_POINT_CALLBACK, false);
             codeReader.hints.set(DecodeHintType.ASSUME_CODE_39_CHECK_DIGIT, false);
             codeReaderRef.current = codeReader;
