@@ -326,10 +326,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           // Workerに画像データを送信
           if (workerRef.current) {
             workerRef.current.postMessage({
-              imageData: imageData.data.buffer,
+              imageData: imageData.data,
               width,
               height
-            }, [imageData.data.buffer]);
+            });
           }
           lastScanTimeRef.current = now;
         } catch (error) {
