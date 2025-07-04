@@ -119,10 +119,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
-          // 高解像度テスト: 2560×1440に変更
-          width: { min: 1920, ideal: 2560, max: 3840 },
-          height: { min: 1080, ideal: 1440, max: 2160 },
-          // フレームレートを調整してパフォーマンス向上
+          // カメラストリームの解像度を下げる
+          width: { ideal: 1280, max: 1280 },
+          height: { ideal: 720, max: 720 },
           frameRate: { min: 15, ideal: 25, max: 30 },
           aspectRatio: { ideal: 1.777777778 }
         }
@@ -282,16 +281,16 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const canvas = canvasRef.current;
       const context = canvasContextRef.current;
 
-      // 高解像度テスト: 処理用解像度を調整
-      const width = Math.floor(video.videoWidth / 1.2); // 1.8から1.2に変更して高解像度を維持
-      const height = Math.floor(video.videoHeight / 1.2);
+      // Canvas最適化
+      // Canvasは高解像度で維持
+      const width = 2560;
+      const height = 1440;
       canvas.width = width;
       canvas.height = height;
-
-      // Canvas最適化
       context.clearRect(0, 0, width, height);
       context.imageSmoothingEnabled = false;
       context.imageSmoothingQuality = 'low';
+      // カメラ画像を拡大して描画
       context.drawImage(video, 0, 0, width, height);
 
       try {
