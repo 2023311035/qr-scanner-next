@@ -3,9 +3,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
-// Web Workerの型をimport（型エラー回避用）
-// @ts-ignore
-import QrWorker from '../workers/qrWorker.ts?worker';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -182,7 +179,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
 
   // Workerの初期化
   useEffect(() => {
-    workerRef.current = new QrWorker();
+    workerRef.current = new Worker(new URL('../workers/qrWorker.ts', import.meta.url), { type: 'module' });
     if (workerRef.current) {
       workerRef.current.onmessage = (e: MessageEvent) => {
         const { result } = e.data;
