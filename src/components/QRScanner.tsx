@@ -288,9 +288,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       canvas.width = width;
       canvas.height = height;
 
-      // 画像の前処理を最適化
-      context.imageSmoothingEnabled = true;
-      context.imageSmoothingQuality = 'high'; // mediumからhighに戻す
+      // Canvas最適化
+      context.clearRect(0, 0, width, height);
+      context.imageSmoothingEnabled = false;
+      context.imageSmoothingQuality = 'low';
       context.drawImage(video, 0, 0, width, height);
 
       try {
