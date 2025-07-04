@@ -119,11 +119,11 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "environment",
-          // 高解像度を維持しつつ、フレームレートで調整
-          width: { min: 1280, ideal: 1920, max: 2560 },
-          height: { min: 720, ideal: 1080, max: 1440 },
-          // フレームレートを適度に調整してパフォーマンス向上
-          frameRate: { min: 20, ideal: 30, max: 45 },
+          // 高解像度テスト: 2560×1440に変更
+          width: { min: 1920, ideal: 2560, max: 3840 },
+          height: { min: 1080, ideal: 1440, max: 2160 },
+          // フレームレートを調整してパフォーマンス向上
+          frameRate: { min: 15, ideal: 25, max: 30 },
           aspectRatio: { ideal: 1.777777778 }
         }
       });
@@ -283,9 +283,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const canvas = canvasRef.current;
       const context = canvasContextRef.current;
 
-      // 高解像度を維持しつつ、処理用の解像度を適度に調整
-      const width = Math.floor(video.videoWidth / 1.8); // 2から1.8に変更して解像度を少し上げる
-      const height = Math.floor(video.videoHeight / 1.8);
+      // 高解像度テスト: 処理用解像度を調整
+      const width = Math.floor(video.videoWidth / 1.2); // 1.8から1.2に変更して高解像度を維持
+      const height = Math.floor(video.videoHeight / 1.2);
       canvas.width = width;
       canvas.height = height;
 
@@ -297,9 +297,9 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       const now = performance.now();
       const timeSinceLastScan = now - lastScanTimeRef.current;
 
-      // 高速スキャン間隔（0.5秒間隔で常時動作）
-      const scanInterval = 500; // 高速スキャン: 0.5秒
-      const frameInterval = 2; // 高速スキャン: 2フレームごと
+      // 高解像度テスト: スキャン間隔を調整
+      const scanInterval = 800; // 高解像度対応: 0.8秒間隔
+      const frameInterval = 3; // 高解像度対応: 3フレームごと
       
       frameCountRef.current++;
       if (frameCountRef.current % frameInterval === 0 && timeSinceLastScan >= scanInterval) {
@@ -441,8 +441,8 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
             const context = canvas.getContext('2d');
             if (!context) return;
 
-            // キャンバスのサイズを画像に合わせる（高解像度対応）
-            const maxSize = 2560; // 1920から2560に増加して高解像度対応
+            // キャンバスのサイズを画像に合わせる（高解像度テスト）
+            const maxSize = 3840; // 2560から3840に増加して高解像度テスト
             let width = img.width;
             let height = img.height;
             
