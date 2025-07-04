@@ -43,7 +43,7 @@ self.onmessage = async (event: MessageEvent) => {
     htmlCanvas.height = height;
     const htmlCtx = htmlCanvas.getContext('2d');
     if (!htmlCtx) throw new Error('HTMLCanvas context取得失敗');
-    htmlCtx.drawImage(canvas as any, 0, 0);
+    htmlCtx.drawImage(canvas as unknown as CanvasImageSource, 0, 0);
 
     // decodeFromCanvasでデコード
     const result = await codeReader.decodeFromCanvas(htmlCanvas);
@@ -52,7 +52,7 @@ self.onmessage = async (event: MessageEvent) => {
     } else {
       self.postMessage({ result: null });
     }
-  } catch (e) {
+  } catch {
     self.postMessage({ result: null });
   }
 }; 
