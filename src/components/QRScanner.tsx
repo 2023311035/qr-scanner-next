@@ -30,7 +30,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const lastCleanupTimeRef = useRef(0);
   const canvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const animationFrameRef = useRef<number | null>(null);
-  const workerRef = useRef<Worker | null>(null);
 
   // メモリクリーンアップ関数
   const cleanupMemory = useCallback(() => {
@@ -177,22 +176,6 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     };
   }, [stopCamera]);
 
-  // Workerの初期化
-  useEffect(() => {
-    workerRef.current = new Worker(new URL('../workers/qrWorker.ts', import.meta.url), { type: 'module' });
-    if (workerRef.current) {
-      workerRef.current.onmessage = (e: MessageEvent) => {
-        const { result } = e.data;
-        if (result) {
-          processScannedCode(result);
-        }
-      };
-    }
-    return () => {
-      workerRef.current?.terminate();
-    };
-  }, [processScannedCode]);
-
   useEffect(() => {
     let video: HTMLVideoElement | null = null;
     let isInitialized = false;
@@ -292,11 +275,10 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     };
 
     const scanCode = async () => {
-      if (!video || !canvasRef.current || !canvasContextRef.current || isScanningRef.current) {
+      if (!video || !canvasRef.current || !codeReaderRef.current || !canvasContextRef.current || isScanningRef.current) {
         animationFrameRef.current = requestAnimationFrame(scanCode);
         return;
       }
-      
       const canvas = canvasRef.current;
       const context = canvasContextRef.current;
 
@@ -311,36 +293,21 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       context.imageSmoothingQuality = 'high'; // mediumからhighに戻す
       context.drawImage(video, 0, 0, width, height);
 
-      const now = performance.now();
-      const timeSinceLastScan = now - lastScanTimeRef.current;
-
-      // 高解像度テスト: スキャン間隔を調整
-      const scanInterval = 800; // 高解像度対応: 0.8秒間隔
-      const frameInterval = 3; // 高解像度対応: 3フレームごと
-      
-      frameCountRef.current++;
-      if (frameCountRef.current % frameInterval === 0 && timeSinceLastScan >= scanInterval) {
+      try {
         isScanningRef.current = true;
-        try {
-          const imageData = context.getImageData(0, 0, width, height);
-          // Workerに画像データを送信
-          if (workerRef.current) {
-            workerRef.current.postMessage({
-              imageData: imageData.data,
-              width,
-              height
-            });
-          }
-          lastScanTimeRef.current = now;
-        } catch (error) {
-          if (error instanceof Error && !error.message.includes('NotFoundException')) {
-            console.error('スキャンエラー:', error);
-          }
-        } finally {
-          isScanningRef.current = false;
+        const result = await codeReaderRef.current.decodeFromCanvas(canvas);
+        if (result) {
+          const code = result.getText();
+          processScannedCode(code);
         }
+        lastScanTimeRef.current = performance.now();
+      } catch (error) {
+        if (error instanceof Error && !error.message.includes('NotFoundException')) {
+          console.error('スキャンエラー:', error);
+        }
+      } finally {
+        isScanningRef.current = false;
       }
-
       animationFrameRef.current = requestAnimationFrame(scanCode);
     };
 
