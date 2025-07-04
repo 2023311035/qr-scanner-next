@@ -3,6 +3,9 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
 import { BarcodeFormat, DecodeHintType } from '@zxing/library';
+// Web Workerの型をimport（型エラー回避用）
+// @ts-ignore
+import QrWorker from '../workers/qrWorker.ts?worker';
 
 interface QRScannerProps {
   onScanSuccess: (decodedText: string) => void;
@@ -30,6 +33,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
   const lastCleanupTimeRef = useRef(0);
   const canvasContextRef = useRef<CanvasRenderingContext2D | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const workerRef = useRef<Worker | null>(null);
 
   // メモリクリーンアップ関数
   const cleanupMemory = useCallback(() => {
@@ -176,6 +180,22 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     };
   }, [stopCamera]);
 
+  // Workerの初期化
+  useEffect(() => {
+    workerRef.current = new QrWorker();
+    if (workerRef.current) {
+      workerRef.current.onmessage = (e: MessageEvent) => {
+        const { result } = e.data;
+        if (result) {
+          processScannedCode(result);
+        }
+      };
+    }
+    return () => {
+      workerRef.current?.terminate();
+    };
+  }, [processScannedCode]);
+
   useEffect(() => {
     let video: HTMLVideoElement | null = null;
     let isInitialized = false;
@@ -275,7 +295,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
     };
 
     const scanCode = async () => {
-      if (!video || !canvasRef.current || !codeReaderRef.current || !canvasContextRef.current || isScanningRef.current) {
+      if (!video || !canvasRef.current || !canvasContextRef.current || isScanningRef.current) {
         animationFrameRef.current = requestAnimationFrame(scanCode);
         return;
       }
@@ -305,10 +325,14 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
       if (frameCountRef.current % frameInterval === 0 && timeSinceLastScan >= scanInterval) {
         isScanningRef.current = true;
         try {
-          const result = await codeReaderRef.current.decodeFromCanvas(canvas);
-          if (result) {
-            const code = result.getText();
-            processScannedCode(code);
+          const imageData = context.getImageData(0, 0, width, height);
+          // Workerに画像データを送信
+          if (workerRef.current) {
+            workerRef.current.postMessage({
+              imageData: imageData.data.buffer,
+              width,
+              height
+            }, [imageData.data.buffer]);
           }
           lastScanTimeRef.current = now;
         } catch (error) {
