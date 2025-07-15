@@ -122,7 +122,7 @@ export default function QRScanner({ onScanSuccess }: QRScannerProps) {
           // 高解像度に戻す
           width: { min: 1920, ideal: 2560, max: 3840 },
           height: { min: 1080, ideal: 1440, max: 2160 },
-          frameRate: { min: 15, ideal: 25, max: 30 },
+          frameRate: { min: 20, ideal: 30, max: 45 },
           aspectRatio: { ideal: 1.777777778 }
         }
       });
